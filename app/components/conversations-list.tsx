@@ -114,7 +114,7 @@ export function ConversationsList({ selectedConversation, onSelectConversation }
             <div className="flex items-center mb-3">
               <User className="h-4 w-4 text-gray-600 mr-2" />
               <h3 className="font-medium text-gray-800">Inbox</h3>
-              <Badge variant="secondary" className="ml-auto bg-yellow-500 text-yellow-50">
+              <Badge variant="secondary" className="ml-auto bg-red-100 text-red-800">
                 {inboxConversations.length}
               </Badge>
             </div>
