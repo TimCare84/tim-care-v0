@@ -51,9 +51,13 @@ const navigationItems = [
   },
 ]
 
-export function Sidebar() {
+type SidebarProps = {
+  activeSection: string;
+  setActiveSection: React.Dispatch<React.SetStateAction<string>>;
+};
+
+export function Sidebar({ activeSection, setActiveSection }: SidebarProps) {
   const { state, toggleSidebar } = useSidebar()
-  const [activeSection, setActiveSection] = useState("dashboard")
   const [activeSubcategory, setActiveSubcategory] = useState("todos")
   const isCollapsed = state === "collapsed"
 
