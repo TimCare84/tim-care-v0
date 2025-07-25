@@ -51,18 +51,15 @@ const navigationItems = [
   },
 ]
 
-interface SidebarProps {
-  activeSection: string
-  setActiveSection: (section: string) => void
-}
+type SidebarProps = {
+  activeSection: string;
+  setActiveSection: React.Dispatch<React.SetStateAction<string>>;
+};
 
 export function Sidebar({ activeSection, setActiveSection }: SidebarProps) {
   const { state, toggleSidebar } = useSidebar()
   const [activeSubcategory, setActiveSubcategory] = useState("todos")
   const isCollapsed = state === "collapsed"
-
-  // Remove the local activeSection state since it's now passed as props
-  // const [activeSection, setActiveSection] = useState("dashboard")
 
   return (
     <div
