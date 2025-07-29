@@ -10,6 +10,7 @@ export type Clinic = {
 
 // ejemplo para obtener todas las clínicas
 export async function getAllClinics(): Promise<Clinic[]> {
+
   const { data, error } = await supabase
     .from("clinics")
     .select("*")
@@ -18,4 +19,6 @@ export async function getAllClinics(): Promise<Clinic[]> {
 
   if (error) throw error
   return data as Clinic[]
+  
 }
+
