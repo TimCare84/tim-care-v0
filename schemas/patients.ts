@@ -3,7 +3,7 @@ export type Patient = {
     customer_id: string
     patient_name?: string
     relationship?: string
-    date_of_birth?: string
+    date_of_birth?: Date
     clinic_id: string
     created_at?: string
     updated_at?: string
