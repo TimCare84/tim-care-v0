@@ -6,77 +6,10 @@ import { Input } from "@/components/ui/input"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Send, Zap, Phone, Calendar, MapPin, FileText, CreditCard, Bot, User } from "lucide-react"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import { useChatContext } from "./chat-context"
+import { getCustomerDisplayName, getUserInitials, formatMessageTime, formatLastUpdate } from "./chat-utils"
 
-interface Message {
-  id: string
-  content: string
-  sender: "patient" | "clinic" | "ai"
-  timestamp: string
-  time: string
-}
-
-const mockMessages: Record<string, Message[]> = {
-  "1": [
-    {
-      id: "1",
-      content: "Hola, necesito reagendar mi cita para la próxima semana por favor",
-      sender: "patient",
-      timestamp: "Hoy",
-      time: "10:25",
-    },
-    {
-      id: "2",
-      content: "Por supuesto, puedo ayudarte con eso. ¿Qué día de la próxima semana te viene mejor?",
-      sender: "ai",
-      timestamp: "Hoy",
-      time: "10:26",
-    },
-    {
-      id: "3",
-      content: "Preferiría el miércoles o jueves si es posible",
-      sender: "patient",
-      timestamp: "Hoy",
-      time: "10:28",
-    },
-    {
-      id: "4",
-      content: "Tengo disponibilidad el miércoles a las 14:00 o el jueves a las 10:30. ¿Cuál prefieres?",
-      sender: "ai",
-      timestamp: "Hoy",
-      time: "10:29",
-    },
-    {
-      id: "5",
-      content: "El miércoles a las 14:00 está perfecto",
-      sender: "patient",
-      timestamp: "Hoy",
-      time: "10:30",
-    },
-  ],
-  "2": [
-    {
-      id: "1",
-      content: "¿A qué hora es mi cita de mañana?",
-      sender: "patient",
-      timestamp: "Hoy",
-      time: "09:40",
-    },
-    {
-      id: "2",
-      content: "Tu cita está programada para mañana a las 11:00 AM con el Dr. Martínez.",
-      sender: "ai",
-      timestamp: "Hoy",
-      time: "09:41",
-    },
-    {
-      id: "3",
-      content: "Perfecto, gracias por la información",
-      sender: "patient",
-      timestamp: "Hoy",
-      time: "09:45",
-    },
-  ],
-}
+// Remover datos mock - ahora usamos el contexto
 
 interface ChatWindowProps {
   conversationId: string
@@ -84,7 +17,10 @@ interface ChatWindowProps {
 
 export function ChatWindow({ conversationId }: ChatWindowProps) {
   const [message, setMessage] = useState("")
-  const messages = mockMessages[conversationId] || []
+  const { messages, customers } = useChatContext()
+  
+  const chatMessages = messages[conversationId] || []
+  const customer = customers[conversationId]
 
   const handleSendMessage = () => {
     if (message.trim()) {
@@ -109,66 +45,98 @@ export function ChatWindow({ conversationId }: ChatWindowProps) {
         <div className="flex items-center space-x-3">
           <Avatar className="h-10 w-10">
             <AvatarFallback className="bg-gradient-to-br from-blue-400 to-blue-600 text-white font-medium">
-              AG
+              {getUserInitials(customer)}
             </AvatarFallback>
           </Avatar>
           <div>
-            <h3 className="font-medium text-gray-900">Ana García Martínez</h3>
-            <p className="text-sm text-gray-500">En línea hace 2 min</p>
+            <h3 className="font-medium text-gray-900">{getCustomerDisplayName(customer)}</h3>
+            <p className="text-sm text-gray-500">
+              {customer?.last_interaction 
+                ? `Última actividad: ${formatLastUpdate(customer.last_interaction)}`
+                : 'Estado desconocido'
+              }
+            </p>
           </div>
         </div>
       </div>
 
       {/* Messages */}
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
-        {messages.map((msg, index) => {
-          const showTimestamp = index === 0 || messages[index - 1].timestamp !== msg.timestamp
-
-          return (
-            <div key={msg.id}>
-              {showTimestamp && <div className="text-center text-xs text-gray-500 mb-4">{msg.timestamp}</div>}
-
-              <div className={`flex ${msg.sender === "patient" ? "justify-start" : "justify-end"}`}>
-                <div
-                  className={`flex items-start space-x-2 max-w-xs lg:max-w-md ${
-                    msg.sender === "patient" ? "flex-row" : "flex-row-reverse space-x-reverse"
-                  }`}
-                >
-                  <Avatar className="h-8 w-8">
-                    <AvatarFallback
-                      className={`text-white font-medium ${
-                        msg.sender === "patient"
-                          ? "bg-gradient-to-br from-gray-400 to-gray-600"
-                          : msg.sender === "ai"
-                            ? "bg-gradient-to-br from-green-400 to-green-600"
-                            : "bg-gradient-to-br from-blue-400 to-blue-600"
-                      }`}
-                    >
-                      {msg.sender === "patient" ? (
-                        <User className="h-4 w-4" />
-                      ) : msg.sender === "ai" ? (
-                        <Bot className="h-4 w-4" />
-                      ) : (
-                        "C"
-                      )}
-                    </AvatarFallback>
-                  </Avatar>
-
-                  <div
-                    className={`rounded-lg p-3 ${
-                      msg.sender === "patient" ? "bg-gray-100 text-gray-900" : "bg-blue-500 text-white"
-                    }`}
-                  >
-                    <p className="text-sm">{msg.content}</p>
-                    <p className={`text-xs mt-1 ${msg.sender === "patient" ? "text-gray-500" : "text-blue-100"}`}>
-                      {msg.time}
-                    </p>
-                  </div>
-                </div>
-              </div>
+        {chatMessages.length === 0 ? (
+          <div className="flex-1 flex items-center justify-center">
+            <div className="text-center text-gray-500">
+              <p className="text-sm">No hay mensajes en esta conversación</p>
+              <p className="text-xs mt-1">Los mensajes aparecerán aquí cuando se envíen</p>
             </div>
-          )
-        })}
+          </div>
+        ) : (
+          chatMessages.map((msg, index) => {
+            const msgTime = formatMessageTime(msg.timestamp)
+            const showTimestamp = index === 0 || 
+              (chatMessages[index - 1].timestamp && 
+               new Date(chatMessages[index - 1].timestamp!).toDateString() !== new Date(msg.timestamp!).toDateString())
+
+            return (
+              <div key={msg.id}>
+                {showTimestamp && (
+                  <div className="text-center text-xs text-gray-500 mb-4">
+                    {msg.timestamp ? new Date(msg.timestamp).toLocaleDateString('es-ES', { 
+                      weekday: 'long', 
+                      year: 'numeric', 
+                      month: 'long', 
+                      day: 'numeric' 
+                    }) : 'Fecha desconocida'}
+                  </div>
+                )}
+
+                {/* Determinar si es mensaje del usuario (izquierda) o de la API (derecha) */}
+                {(() => {
+                  const isUserMessage = msg.sender === "userMessage"
+                  const isApiMessage = msg.sender === "apiMessage"
+                  
+                  return (
+                    <div className={`flex ${isUserMessage ? "justify-start" : "justify-end"}`}>
+                      <div
+                        className={`flex items-start space-x-2 max-w-xs lg:max-w-md ${
+                          isUserMessage ? "flex-row" : "flex-row-reverse space-x-reverse"
+                        }`}
+                      >
+                        <Avatar className="h-8 w-8">
+                          <AvatarFallback
+                            className={`text-white font-medium ${
+                              isUserMessage
+                                ? "bg-gradient-to-br from-gray-400 to-gray-600"
+                                : "bg-gradient-to-br from-blue-400 to-blue-600"
+                            }`}
+                          >
+                            {isUserMessage ? (
+                              <User className="h-4 w-4" />
+                            ) : (
+                              <Bot className="h-4 w-4" />
+                            )}
+                          </AvatarFallback>
+                        </Avatar>
+
+                        <div
+                          className={`rounded-lg p-3 ${
+                            isUserMessage 
+                              ? "bg-gray-100 text-gray-900" 
+                              : "bg-blue-500 text-white"
+                          }`}
+                        >
+                          <p className="text-sm">{msg.content || 'Mensaje sin contenido'}</p>
+                          <p className={`text-xs mt-1 ${isUserMessage ? "text-gray-500" : "text-blue-100"}`}>
+                            {msgTime}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )
+                })()}
+              </div>
+            )
+          })
+        )}
       </div>
 
       {/* Message Input */}
