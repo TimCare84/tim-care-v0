@@ -1,5 +1,4 @@
 "use client"
-
 import { useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -36,17 +35,23 @@ const dataByFilter = {
     { time: "Sem 3", agendados: 295, asistieron: 268 },
     { time: "Sem 4", agendados: 310, asistieron: 285 },
   ],
+  mensual: [
+    { time: "Enero", agendados: 1200, asistieron: 1050 },
+    { time: "Febrero", agendados: 1150, asistieron: 1000 },
+    { time: "Marzo", agendados: 1300, asistieron: 1180 },
+    { time: "Abril", agendados: 1250, asistieron: 1100 },
+  ],
 }
 
 export function Dashboard() {
-  const [activeFilter, setActiveFilter] = useState<"hora" | "diario" | "semanal">("diario")
+  const [activeFilter, setActiveFilter] = useState<"hora" | "diario" | "semanal" | "mensual">("diario")
 
   return (
     <div className="p-6 space-y-6">
       <div className="flex items-center justify-between">
         <h2 className="text-2xl font-bold text-gray-800">Dashboard</h2>
         <div className="flex space-x-2">
-          {(["hora", "diario", "semanal"] as const).map((filter) => (
+          {(["hora", "diario", "semanal", "mensual"] as const).map((filter) => (
             <Button
               key={filter}
               variant={activeFilter === filter ? "default" : "outline"}
@@ -98,32 +103,25 @@ export function Dashboard() {
         </Card>
       </div>
 
-      {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card>
-          <CardContent className="p-4">
-            <div className="text-2xl font-bold text-blue-600">156</div>
-            <div className="text-sm text-gray-600">Total Pacientes</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <div className="text-2xl font-bold text-green-600">89%</div>
-            <div className="text-sm text-gray-600">Tasa de Asistencia</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <div className="text-2xl font-bold text-yellow-600">12</div>
-            <div className="text-sm text-gray-600">Citas Pendientes</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <div className="text-2xl font-bold text-purple-600">3</div>
-            <div className="text-sm text-gray-600">Requieren Atención</div>
-          </CardContent>
-        </Card>
+      {/* New Metrics Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+        {[
+          { label: "Total conversaciones", value: 156, color: "text-blue-600" },
+          { label: "En proceso", value: 89, color: "text-green-600" }, // Renamed
+          { label: "Estancados", value: 12, color: "text-red-600" },
+          { label: "Pagados", value: 25, color: "text-emerald-600" },
+          { label: "Con expediente", value: 110, color: "text-yellow-600" },
+          { label: "Asistidos", value: 78, color: "text-cyan-600" },
+          { label: "Intervenciones Humanas", value: 18, color: "text-orange-600" },
+          { label: "Tiempo promedio de respuesta", value: "2 min", color: "text-gray-600" },
+        ].map((metric, index) => (
+          <Card key={index}>
+            <CardContent className="p-4">
+              <div className={`text-2xl font-bold ${metric.color}`}>{metric.value}</div>
+              <div className="text-sm text-gray-600">{metric.label}</div>
+            </CardContent>
+          </Card>
+        ))}
       </div>
     </div>
   )

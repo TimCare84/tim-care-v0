@@ -38,7 +38,7 @@ export function PatientInfo({ conversationId }: PatientInfoProps) {
   if (!patient) {
     return (
       <div className="p-6 h-full flex items-center justify-center">
-        <p className="text-gray-500">Selecciona una conversación para ver la información del paciente</p>
+        <p className="text-muted-foreground">Selecciona una conversación para ver la información del paciente</p>
       </div>
     )
   }
@@ -68,9 +68,9 @@ export function PatientInfo({ conversationId }: PatientInfoProps) {
             </Avatar>
 
             <div className="space-y-2">
-              <h3 className="font-semibold text-lg text-gray-900">{patient.name}</h3>
+              <h3 className="font-semibold text-lg text-foreground">{patient.name}</h3>
 
-              <div className="flex items-center justify-center space-x-2 text-gray-600">
+              <div className="flex items-center justify-center space-x-2 text-muted-foreground">
                 <Phone className="h-4 w-4" />
                 <span className="text-sm">{patient.phone}</span>
               </div>
@@ -87,13 +87,13 @@ export function PatientInfo({ conversationId }: PatientInfoProps) {
       <Card>
         <CardContent className="p-6 space-y-4">
           <div>
-            <h4 className="font-medium text-gray-900 mb-2">Motivo de Contacto</h4>
-            <p className="text-sm text-gray-600">{patient.contactReason}</p>
+            <h4 className="font-medium text-foreground mb-2">Motivo de Contacto</h4>
+            <p className="text-sm text-muted-foreground">{patient.contactReason}</p>
           </div>
 
           <div>
-            <h4 className="font-medium text-gray-900 mb-2">Descripción</h4>
-            <p className="text-sm text-gray-600 leading-relaxed">{patient.description}</p>
+            <h4 className="font-medium text-foreground mb-2">Descripción</h4>
+            <p className="text-sm text-muted-foreground leading-relaxed">{patient.description}</p>
           </div>
         </CardContent>
       </Card>
@@ -101,15 +101,15 @@ export function PatientInfo({ conversationId }: PatientInfoProps) {
       {/* Additional Info */}
       <Card>
         <CardContent className="p-6">
-          <h4 className="font-medium text-gray-900 mb-4">Información Adicional</h4>
+          <h4 className="font-medium text-foreground mb-4">Información Adicional</h4>
           <div className="space-y-3 text-sm">
             <div className="flex justify-between">
-              <span className="text-gray-600">Última actividad:</span>
-              <span className="font-medium">Hace 2 min</span>
+              <span className="text-muted-foreground">Última actividad:</span>
+              <span className="font-medium text-foreground">Hace 2 min</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-gray-600">Citas programadas:</span>
-              <span className="font-medium">1 pendiente</span>
+              <span className="text-muted-foreground">Citas programadas:</span>
+              <span className="font-medium text-foreground">1 pendiente</span>
             </div>
           </div>
         </CardContent>

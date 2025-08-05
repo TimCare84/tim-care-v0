@@ -1,10 +1,12 @@
 -- Insert sample patients
 INSERT INTO patients (name, phone, email, avatar_initials, status, contact_reason, description, needs_intervention) VALUES
 ('Ana García Martínez', '+34 612 345 678', 'ana.garcia@email.com', 'AG', 'proceso', 'Reagendar cita médica', 'La paciente necesita cambiar su cita programada para la próxima semana debido a un compromiso laboral imprevisto. Prefiere horarios de tarde.', true),
-('Carlos López Ruiz', '+34 687 654 321', 'carlos.lopez@email.com', 'CL', 'agendado', 'Consulta sobre cita', 'Paciente consulta sobre el horario de su cita programada para mañana. Cita confirmada para las 11:00 AM con el Dr. Martínez.', false),
+('Carlos López Ruiz', '+34 687 654 321', 'carlos.lopez@email.com', 'CL', 'proceso', 'Consulta sobre cita', 'Paciente consulta sobre el horario de su cita programada para mañana. Cita confirmada para las 11:00 AM con el Dr. Martínez.', false),
 ('María Rodríguez', '+34 655 987 654', 'maria.rodriguez@email.com', 'MR', 'estancado', 'Dolor de cabeza persistente', 'Paciente reporta dolor de cabeza desde hace 3 días. Requiere evaluación médica urgente.', true),
 ('José Martínez', '+34 644 123 789', 'jose.martinez@email.com', 'JM', 'pagado', 'Consulta de seguimiento', 'Paciente satisfecho con el tratamiento. Consulta de seguimiento programada.', false),
-('Laura Sánchez', '+34 633 456 012', 'laura.sanchez@email.com', 'LS', 'proceso', 'Cambio de cita', 'Solicita cambio de horario para su cita programada.', true);
+('Laura Sánchez', '+34 633 456 012', 'laura.sanchez@email.com', 'LS', 'proceso', 'Cambio de cita', 'Solicita cambio de horario para su cita programada.', true),
+('Pedro González', '+34 622 789 012', 'pedro.gonzalez@email.com', 'PG', 'pagado', 'Confirmación de pago', 'Paciente confirma que el pago ha sido realizado.', false),
+('Carmen Díaz', '+34 677 012 345', 'carmen.diaz@email.com', 'CD', 'proceso', 'Consulta post-tratamiento', 'Paciente con dudas sobre el cuidado post-tratamiento.', false);
 
 -- Insert conversations
 INSERT INTO conversations (patient_id, status, last_message, needs_intervention) 
@@ -17,6 +19,8 @@ SELECT
     WHEN p.name = 'María Rodríguez' THEN 'Tengo dolor de cabeza desde ayer'
     WHEN p.name = 'José Martínez' THEN 'Gracias por la información sobre los medicamentos'
     WHEN p.name = 'Laura Sánchez' THEN '¿Puedo cambiar mi cita?'
+    WHEN p.name = 'Pedro González' THEN 'El pago ya fue procesado correctamente'
+    WHEN p.name = 'Carmen Díaz' THEN '¿Cómo va mi recuperación?'
   END,
   p.needs_intervention
 FROM patients p;
@@ -36,6 +40,8 @@ SELECT
     WHEN cd.name = 'María Rodríguez' THEN 'Tengo dolor de cabeza desde ayer'
     WHEN cd.name = 'José Martínez' THEN 'Gracias por la información sobre los medicamentos'
     WHEN cd.name = 'Laura Sánchez' THEN '¿Puedo cambiar mi cita?'
+    WHEN cd.name = 'Pedro González' THEN 'El pago ya fue procesado correctamente'
+    WHEN cd.name = 'Carmen Díaz' THEN '¿Cómo va mi recuperación?'
   END,
   'patient',
   NOW() - INTERVAL '1 hour'

@@ -5,7 +5,7 @@ CREATE TABLE IF NOT EXISTS patients (
   phone VARCHAR(20) NOT NULL,
   email VARCHAR(255),
   avatar_initials VARCHAR(5) NOT NULL,
-  status VARCHAR(20) DEFAULT 'todos' CHECK (status IN ('todos', 'proceso', 'estancado', 'agendado', 'pagado', 'posventa')),
+  status VARCHAR(20) DEFAULT 'todos' CHECK (status IN ('todos', 'proceso', 'estancado', 'pagado')), -- Updated CHECK constraint
   contact_reason TEXT,
   description TEXT,
   needs_intervention BOOLEAN DEFAULT false,
