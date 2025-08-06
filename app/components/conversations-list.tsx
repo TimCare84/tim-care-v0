@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState, useMemo, useEffect, useCallback } from "react"
+import React, { useState, useMemo, useEffect, useCallback, Suspense } from "react"
 import { Input } from "@/components/ui/input"
 import { Search, Bot, User } from "lucide-react"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
@@ -18,7 +18,8 @@ interface ConversationsListProps {
   onSelectConversation: (id: string) => void
 }
 
-export function ConversationsList({ selectedConversation, onSelectConversation }: ConversationsListProps) {
+// Componente interno que usa useSearchParams
+function ConversationsListContent({ selectedConversation, onSelectConversation }: ConversationsListProps) {
   const [searchTerm, setSearchTerm] = useState("")
   const { chats, messages, loadMessagesForChat, loadUserMessages } = useChatContext()
   const searchParams = useSearchParams()
@@ -48,6 +49,12 @@ export function ConversationsList({ selectedConversation, onSelectConversation }
 
   // Función para manejar la selección de usuario y cargar sus mensajes
   const handleSelectConversation = useCallback(async (userId: string) => {
+    // Verificar que searchParams esté disponible (para SSR)
+    if (!searchParams) {
+      console.error('Search params not available')
+      return
+    }
+    
     const clinicId = searchParams.get('clinic_id')
     if (!clinicId) {
       console.error('No clinic_id found in URL')
@@ -75,6 +82,11 @@ export function ConversationsList({ selectedConversation, onSelectConversation }
   // Cargar usuarios de la clínica solo una vez
   useEffect(() => {
     const loadClinicUsers = async () => {
+      // Verificar que searchParams esté disponible (para SSR)
+      if (!searchParams) {
+        return
+      }
+      
       const clinicId = searchParams.get('clinic_id')
       if (!clinicId) {
         console.log('No clinic_id found in URL')
@@ -101,7 +113,7 @@ export function ConversationsList({ selectedConversation, onSelectConversation }
     }
 
     loadClinicUsers()
-  }, [searchParams.get('clinic_id')]) // Solo depender del clinic_id, no de todo searchParams
+  }, [searchParams, clinicUsers.length]) // Depender de searchParams completo y clinicUsers.length
 
   // Cargar último mensaje para cada chat si no está en cache - Comentado temporalmente
   // React.useEffect(() => {
@@ -430,5 +442,36 @@ export function ConversationsList({ selectedConversation, onSelectConversation }
         )}
       </div>
     </div>
+  )
+}
+
+// Componente wrapper con Suspense
+export function ConversationsList({ selectedConversation, onSelectConversation }: ConversationsListProps) {
+  return (
+    <Suspense fallback={
+      <div className="h-full flex flex-col">
+        <div className="p-4 border-b border-gray-200">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+            <Input
+              placeholder="Buscar usuarios..."
+              disabled
+              className="pl-10"
+            />
+          </div>
+        </div>
+        <div className="flex-1 flex items-center justify-center">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+            <p className="mt-2 text-sm text-gray-600">Cargando...</p>
+          </div>
+        </div>
+      </div>
+    }>
+      <ConversationsListContent 
+        selectedConversation={selectedConversation} 
+        onSelectConversation={onSelectConversation} 
+      />
+    </Suspense>
   )
 }
