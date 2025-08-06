@@ -3,31 +3,28 @@ import { useState } from "react"
 import { Sidebar } from "./components/sidebar"
 import { ChatViewer } from "./components/chat-viewer"
 import { Dashboard } from "./components/dashboard"
-import { CalendarView } from "./components/calendar-view"
 import { SidebarProvider } from "@/components/ui/sidebar"
 
 export default function MedicalCRM() {
-  const [activeSection, setActiveSection] = useState("pacientes")
+const [activeSection, setActiveSection] = useState("pacientes")
 
-  const renderMainContent = () => {
-    switch (activeSection) {
-      case "dashboard":
-        return <Dashboard />
-      case "pacientes":
-        return <ChatViewer />
-      case "calendario":
-        return <CalendarView />
-      default:
-        return <ChatViewer />
-    }
+const renderMainContent = () => {
+  switch (activeSection) {
+    case "dashboard":
+      return <Dashboard />
+    case "pacientes":
+      return <ChatViewer />
+    default:
+      return <ChatViewer />
   }
+}
 
-  return (
-    <SidebarProvider defaultOpen={true}>
-      <div className="flex h-screen w-screen bg-gray-50">
-        <Sidebar activeSection={activeSection} setActiveSection={setActiveSection} />
-        {renderMainContent()}
-      </div>
-    </SidebarProvider>
-  )
+return (
+  <SidebarProvider defaultOpen={true}>
+    <div className="flex h-screen w-screen bg-gray-50">
+      <Sidebar activeSection={activeSection} setActiveSection={setActiveSection} />
+      {renderMainContent()}
+    </div>
+  </SidebarProvider>
+)
 }
