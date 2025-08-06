@@ -92,7 +92,6 @@ export function Dashboard() {
         getPatientsWithAppointments()
       ])
 
-      // console.log(totalPatients, pendingAppointments, patientsWithAppointments)
 
       setStats({
         totalPatients,

@@ -1,13 +1,14 @@
 "use client"
 
-import React, { useState, useMemo } from "react"
+import React, { useState, useMemo, useEffect, useCallback } from "react"
 import { Input } from "@/components/ui/input"
 import { Search, Bot, User } from "lucide-react"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { useChatContext } from "./chat-context"
 import { transformChatToConversationUI, ConversationUIData } from "./chat-utils"
-import { getLastMessageByChat } from "@/lib/querys"
+import { getLastMessageByChat, getUsersByClinicN8N, getUserMessagesN8N, User as UserType } from "@/lib/querys"
+import { useSearchParams } from "next/navigation"
 
 // Usar el tipo ConversationUIData de chat-utils
 type Conversation = ConversationUIData
@@ -19,75 +20,151 @@ interface ConversationsListProps {
 
 export function ConversationsList({ selectedConversation, onSelectConversation }: ConversationsListProps) {
   const [searchTerm, setSearchTerm] = useState("")
-  const { chats, messages, loading, error, loadMessagesForChat } = useChatContext()
+  const { chats, messages, loadMessagesForChat, loadUserMessages } = useChatContext()
+  const searchParams = useSearchParams()
   
   // Estado para manejar los últimos mensajes de cada chat
   const [lastMessages, setLastMessages] = useState<Record<string, string>>({})
+  
+  // Estado para usuarios de la clínica
+  const [clinicUsers, setClinicUsers] = useState<UserType[]>([])
+  const [loadingUsers, setLoadingUsers] = useState(false)
+  const [usersError, setUsersError] = useState<string | null>(null)
 
-  // Función para manejar la selección de conversación
-  const handleSelectConversation = async (chatId: string) => {
-    onSelectConversation(chatId)
-    
-    // Solo mostrar loading si no tenemos mensajes en cache
-    if (!messages[chatId]) {
-      setLoadingMessages(chatId)
+  // Función para manejar la selección de conversación - Comentado temporalmente
+  // const handleSelectConversation = async (chatId: string) => {
+  //   onSelectConversation(chatId)
+  //   
+  //   // Solo mostrar loading si no tenemos mensajes en cache
+  //   if (!messages[chatId]) {
+  //     setLoadingMessages(chatId)
+  //     try {
+  //       await loadMessagesForChat(chatId)
+  //     } finally {
+  //       setLoadingMessages(null)
+  //       }
+  //     }
+  //   }
+
+  // Función para manejar la selección de usuario y cargar sus mensajes
+  const handleSelectConversation = useCallback(async (userId: string) => {
+    const clinicId = searchParams.get('clinic_id')
+    if (!clinicId) {
+      console.error('No clinic_id found in URL')
+      return
+    }
+
+    // Solo cambiar la selección si es diferente
+    if (selectedConversation !== userId) {
+      onSelectConversation(userId)
+
+      // Solo cargar mensajes si no están en cache
+      if (!messages[userId] || messages[userId].length === 0) {
+        try {
+          setLoadingMessages(userId)
+          await loadUserMessages(clinicId, userId)
+        } catch (error) {
+          console.error('Error loading user messages:', error)
+        } finally {
+          setLoadingMessages(null)
+        }
+      }
+    }
+  }, [selectedConversation, messages, searchParams, onSelectConversation, loadUserMessages])
+
+  // Cargar usuarios de la clínica solo una vez
+  useEffect(() => {
+    const loadClinicUsers = async () => {
+      const clinicId = searchParams.get('clinic_id')
+      if (!clinicId) {
+        console.log('No clinic_id found in URL')
+        return
+      }
+
+      // Solo cargar si no tenemos usuarios ya cargados
+      if (clinicUsers.length > 0) {
+        return
+      }
+
+      setLoadingUsers(true)
+      setUsersError(null)
+      
       try {
-        await loadMessagesForChat(chatId)
+        const users = await getUsersByClinicN8N(clinicId, 1, 50, true)
+        setClinicUsers(users)
+      } catch (error) {
+        console.error('Error loading clinic users:', error)
+        setUsersError('Error al cargar usuarios de la clínica')
       } finally {
-        setLoadingMessages(null)
-      }
-    }
-  }
-
-  // Cargar último mensaje para cada chat si no está en cache
-  React.useEffect(() => {
-    const loadLastMessages = async () => {
-      for (const chat of chats) {
-        // Si no tenemos mensajes en cache para este chat, cargar el último mensaje
-        if (!messages[chat.id] && !lastMessages[chat.id]) {
-          try {
-            const lastMessage = await getLastMessageByChat(chat.id)
-            if (lastMessage) {
-              setLastMessages(prev => ({
-                ...prev,
-                [chat.id]: lastMessage.content || 'Mensaje sin contenido'
-              }))
-            }
-          } catch (error) {
-            console.error(`Error loading last message for chat ${chat.id}:`, error)
-          }
-        }
+        setLoadingUsers(false)
       }
     }
 
-    if (chats.length > 0) {
-      loadLastMessages()
-    }
-  }, [chats, messages, lastMessages])
+    loadClinicUsers()
+  }, [searchParams.get('clinic_id')]) // Solo depender del clinic_id, no de todo searchParams
 
-  // Transformar chats a datos de conversación con sus mensajes
+  // Cargar último mensaje para cada chat si no está en cache - Comentado temporalmente
+  // React.useEffect(() => {
+  //   const loadLastMessages = async () => {
+  //     for (const chat of chats) {
+  //       // Si no tenemos mensajes en cache para este chat, cargar el último mensaje
+  //       if (!messages[chat.id] && !lastMessages[chat.id]) {
+  //         try {
+  //           const lastMessage = await getLastMessageByChat(chat.id)
+  //           if (lastMessage) {
+  //             setLastMessages(prev => ({
+  //               ...prev,
+  //               [chat.id]: lastMessage.content || 'Mensaje sin contenido'
+  //             }))
+  //           }
+  //         } catch (error) {
+  //           console.error(`Error loading last message for chat ${chat.id}:`, error)
+  //         }
+  //       }
+  //     }
+  //   }
+
+  //   if (chats.length > 0) {
+  //     loadLastMessages()
+  //   }
+  // }, [chats, messages, lastMessages])
+
+  // Transformar usuarios de la clínica a formato de conversación (temporalmente reemplazando chats de Supabase)
   const conversations = useMemo(() => {
-    return chats.map(chat => {
-      const chatMessages = messages[chat.id] || []
-      
-      // Si no hay mensajes en cache, usar el último mensaje cargado
-      if (chatMessages.length === 0 && lastMessages[chat.id]) {
-        // Crear un mensaje temporal para la transformación
-        const tempMessage = {
-          id: 'temp',
-          chat_id: chat.id,
-          clinic_id: chat.clinic_id,
-          customer_id: chat.customer_id,
-          content: lastMessages[chat.id],
-          sender: 'temp',
-          created_at: new Date().toISOString()
-        }
-        return transformChatToConversationUI(chat, [tempMessage])
-      }
-      
-      return transformChatToConversationUI(chat, chatMessages)
-    })
-  }, [chats, messages, lastMessages])
+    // Comentado temporalmente - usando usuarios de N8N en lugar de chats de Supabase
+    // return chats.map(chat => {
+    //   const chatMessages = messages[chat.id] || []
+    //   
+    //   // Si no hay mensajes en cache, usar el último mensaje cargado
+    //   if (chatMessages.length === 0 && lastMessages[chat.id]) {
+    //     // Crear un mensaje temporal para la transformación
+    //     const tempMessage = {
+    //       id: 'temp',
+    //       chat_id: chat.id,
+    //       clinic_id: chat.clinic_id,
+    //       customer_id: chat.customer_id,
+    //       content: lastMessages[chat.id],
+    //       sender: 'temp',
+    //       created_at: new Date().toISOString()
+    //     }
+    //     return transformChatToConversationUI(chat, [tempMessage])
+    //   }
+    //   
+    //   return transformChatToConversationUI(chat, chatMessages)
+    // })
+
+    // Usar usuarios de N8N como conversaciones
+    return clinicUsers.map(user => ({
+      id: user.id,
+      name: user.user_name,
+      avatar: user.user_name.charAt(0).toUpperCase(),
+      lastMessage: `📱 ${user.whatsapp_number}`,
+      time: new Date(user.last_interaction).toLocaleDateString('es-ES'),
+      status: user.agent_active ? 'inbox' : 'ai',
+      needsIntervention: false,
+      unreadCount: 0
+    }))
+  }, [clinicUsers]) // Cambiado de [chats, messages, lastMessages] a [clinicUsers]
 
   // Estado para indicar qué chat está cargando mensajes
   const [loadingMessages, setLoadingMessages] = useState<string | null>(null)
@@ -99,15 +176,15 @@ export function ConversationsList({ selectedConversation, onSelectConversation }
   const inboxConversations = filteredConversations.filter((conv) => conv.status === "inbox")
   const aiConversations = filteredConversations.filter((conv) => conv.status === "ai")
 
-  // Si está cargando, mostrar skeleton
-  if (loading) {
+  // Si está cargando usuarios, mostrar skeleton
+  if (loadingUsers) {
     return (
       <div className="h-full flex flex-col">
         <div className="p-4 border-b border-gray-200">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
             <Input
-              placeholder="Buscar pacientes..."
+              placeholder="Buscar usuarios..."
               disabled
               className="pl-10"
             />
@@ -116,22 +193,22 @@ export function ConversationsList({ selectedConversation, onSelectConversation }
         <div className="flex-1 flex items-center justify-center">
           <div className="text-center">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
-            <p className="mt-2 text-sm text-gray-600">Cargando conversaciones...</p>
+            <p className="mt-2 text-sm text-gray-600">Cargando usuarios...</p>
           </div>
         </div>
       </div>
     )
   }
 
-  // Si hay error, mostrar mensaje
-  if (error) {
+  // Si hay error al cargar usuarios, mostrar mensaje
+  if (usersError) {
     return (
       <div className="h-full flex flex-col">
         <div className="p-4 border-b border-gray-200">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
             <Input
-              placeholder="Buscar pacientes..."
+              placeholder="Buscar usuarios..."
               disabled
               className="pl-10"
             />
@@ -139,23 +216,23 @@ export function ConversationsList({ selectedConversation, onSelectConversation }
         </div>
         <div className="flex-1 flex items-center justify-center">
           <div className="text-center text-red-600">
-            <p className="text-sm">Error al cargar conversaciones</p>
-            <p className="text-xs mt-1">{error}</p>
+            <p className="text-sm">Error al cargar usuarios</p>
+            <p className="text-xs mt-1">{usersError}</p>
           </div>
         </div>
       </div>
     )
   }
 
-  // Si no hay conversaciones
-  if (conversations.length === 0) {
+  // Si no hay usuarios
+  if (clinicUsers.length === 0) {
     return (
       <div className="h-full flex flex-col">
         <div className="p-4 border-b border-gray-200">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
             <Input
-              placeholder="Buscar pacientes..."
+              placeholder="Buscar usuarios..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="pl-10"
@@ -164,7 +241,7 @@ export function ConversationsList({ selectedConversation, onSelectConversation }
         </div>
         <div className="flex-1 flex items-center justify-center">
           <div className="text-center text-gray-500">
-            <p className="text-sm">No hay conversaciones disponibles</p>
+            <p className="text-sm">No hay usuarios disponibles</p>
           </div>
         </div>
       </div>
@@ -172,6 +249,10 @@ export function ConversationsList({ selectedConversation, onSelectConversation }
   }
 
   const getAvatarGradient = (avatar: string) => {
+    if (!avatar || typeof avatar !== 'string') {
+      return "bg-gradient-to-br from-gray-400 to-gray-600"
+    }
+    
     const gradients = [
       "bg-gradient-to-br from-blue-400 to-blue-600",
       "bg-gradient-to-br from-green-400 to-green-600",
@@ -190,7 +271,7 @@ export function ConversationsList({ selectedConversation, onSelectConversation }
         <div className="relative">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
           <Input
-            placeholder="Buscar pacientes..."
+            placeholder="Buscar usuarios..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="pl-10"
@@ -284,6 +365,66 @@ export function ConversationsList({ selectedConversation, onSelectConversation }
                   </div>
                 </div>
               ))}
+            </div>
+          </div>
+        )}
+
+                {/* Usuarios de la Clínica Section - Comentado temporalmente */}
+        {/* {clinicUsers.length > 0 && (
+          <div className="p-3 border-t border-gray-100">
+            <div className="flex items-center mb-3">
+              <User className="h-4 w-4 text-gray-600 mr-2" />
+              <h3 className="font-medium text-gray-800">Usuarios de la Clínica</h3>
+              <Badge variant="secondary" className="ml-auto bg-blue-100 text-blue-800">
+                {clinicUsers.length}
+              </Badge>
+            </div>
+            <div className="space-y-2">
+              {clinicUsers.map((user) => (
+                <div
+                  key={user.id}
+                  className="p-3 rounded-lg bg-gray-50 border border-gray-200"
+                >
+                  <div className="flex items-start space-x-3">
+                     <Avatar className="h-10 w-10">
+                       <AvatarFallback className={`${getAvatarGradient(user.user_name)} text-white font-medium`}>
+                         {user.user_name.charAt(0).toUpperCase()}
+                       </AvatarFallback>
+                     </Avatar>
+                     <div className="flex-1 min-w-0">
+                       <div className="flex items-center justify-between">
+                         <p className="text-sm font-medium text-gray-900 truncate">{user.user_name}</p>
+                        <Badge variant="outline" className="text-xs">
+                          {user.agent_active ? 'Activo' : 'Inactivo'}
+                        </Badge>
+                      </div>
+                         <p className="text-sm text-gray-600 truncate mt-1">{user.email}</p>
+                        <p className="text-xs text-gray-500 truncate mt-1">
+                          📱 {user.whatsapp_number} • Última interacción: {new Date(user.last_interaction).toLocaleDateString('es-ES')}
+                        </p>
+                     </div>
+                   </div>
+                 </div>
+               ))}
+             </div>
+           </div>
+         )} */}
+
+        {/* Loading Users */}
+        {loadingUsers && (
+          <div className="p-3 border-t border-gray-100">
+            <div className="flex items-center justify-center py-4">
+              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
+              <span className="ml-2 text-sm text-gray-600">Cargando usuarios...</span>
+            </div>
+          </div>
+        )}
+
+        {/* Users Error */}
+        {usersError && (
+          <div className="p-3 border-t border-gray-100">
+            <div className="text-center text-red-600 py-2">
+              <p className="text-sm">{usersError}</p>
             </div>
           </div>
         )}
