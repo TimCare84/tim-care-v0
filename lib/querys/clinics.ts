@@ -14,6 +14,7 @@ export async function getAllClinics(): Promise<Clinic[]> {
     .from("clinics")
     .select("*")
 
+  console.log(data)
 
   if (error) throw error
   return data as Clinic[]

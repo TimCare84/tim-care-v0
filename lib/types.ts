@@ -4,7 +4,7 @@ export interface Patient {
   phone: string
   email?: string
   avatar_initials: string
-  status: "todos" | "proceso" | "estancado" | "agendado" | "pagado" | "posventa"
+  status: "todos" | "proceso" | "estancado" | "pagado"
   contact_reason: string
   description: string
   needs_intervention: boolean
@@ -16,7 +16,7 @@ export interface Patient {
 export interface Conversation {
   id: string
   patient_id: string
-  status: "inbox" | "ai"
+  status: "inbox" | "ai" // Keeping "ai" here as it might be used internally for logic, even if not a display category
   last_message: string
   last_message_time: string
   needs_intervention: boolean
