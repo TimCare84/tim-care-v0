@@ -1,7 +1,5 @@
 "use client"
 
-import type React from "react"
-
 import { useState } from "react"
 import {
   Home,
@@ -14,7 +12,9 @@ import {
   Users,
   Clock,
   AlertTriangle,
+  CheckCircle,
   CreditCard,
+  Phone,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -38,7 +38,9 @@ const navigationItems = [
       { id: "todos", label: "Todos", icon: Users, count: 12, color: "bg-gray-500" },
       { id: "proceso", label: "En proceso", icon: Clock, count: 5, color: "bg-yellow-500" },
       { id: "estancado", label: "Estancado", icon: AlertTriangle, count: 3, color: "bg-red-500" },
+      { id: "agendado", label: "Agendado", icon: CheckCircle, count: 8, color: "bg-green-500" },
       { id: "pagado", label: "Pagado", icon: CreditCard, count: 15, color: "bg-emerald-600" },
+      { id: "posventa", label: "Posventa", icon: Phone, count: 2, color: "bg-purple-500" },
     ],
   },
   {
@@ -50,9 +52,9 @@ const navigationItems = [
 ]
 
 type SidebarProps = {
-  activeSection: string
-  setActiveSection: React.Dispatch<React.SetStateAction<string>>
-}
+  activeSection: string;
+  setActiveSection: React.Dispatch<React.SetStateAction<string>>;
+};
 
 export function Sidebar({ activeSection, setActiveSection }: SidebarProps) {
   const { state, toggleSidebar } = useSidebar()
