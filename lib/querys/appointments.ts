@@ -115,7 +115,6 @@ export async function getAppointmentsByHour(clinic_id?: string) {
 
   if (error) throw error
 
-  console.log('Appointments data for hour grouping:', data)
 
   // Agrupar por hora usando todas las citas
   const hourlyData: Record<string, { agendados: number; asistieron: number }> = {}
@@ -146,7 +145,6 @@ export async function getAppointmentsByHour(clinic_id?: string) {
     ...data
   })).sort((a, b) => parseInt(a.time) - parseInt(b.time))
 
-  console.log('Hour grouping result:', result)
   return result
 }
 
@@ -164,7 +162,6 @@ export async function getAppointmentsByDay(clinic_id?: string) {
 
   if (error) throw error
 
-  console.log('Appointments data for day grouping:', data)
 
   // Agrupar por día usando todas las citas
   const dailyData: Record<string, { agendados: number; asistieron: number }> = {}
@@ -206,7 +203,6 @@ export async function getAppointmentsByDay(clinic_id?: string) {
     }
   })
 
-  console.log('Day grouping result:', result)
   return result
 }
 
@@ -224,7 +220,6 @@ export async function getAppointmentsByWeek(clinic_id?: string) {
 
   if (error) throw error
 
-  console.log('Appointments data for week grouping:', data)
 
   // Simplificar: agrupar todas las citas en semanas basadas en su fecha
   const weeklyData: Record<string, { agendados: number; asistieron: number }> = {}
@@ -258,6 +253,5 @@ export async function getAppointmentsByWeek(clinic_id?: string) {
     return weekA - weekB
   })
 
-  console.log('Week grouping result:', result)
   return result
 } 

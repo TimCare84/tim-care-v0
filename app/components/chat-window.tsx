@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useMemo } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
@@ -17,10 +17,12 @@ interface ChatWindowProps {
 
 export function ChatWindow({ conversationId }: ChatWindowProps) {
   const [message, setMessage] = useState("")
-  const { messages, customers } = useChatContext()
+  const { messages, customers, loadingConversations } = useChatContext()
   
-  const chatMessages = messages[conversationId] || []
-  const customer = customers[conversationId]
+  // Memoizar los datos específicos de esta conversación para evitar re-renderizados
+  const chatMessages = useMemo(() => messages[conversationId] || [], [messages, conversationId])
+  const customer = useMemo(() => customers[conversationId], [customers, conversationId])
+  const isLoading = useMemo(() => loadingConversations[conversationId] || false, [loadingConversations, conversationId])
 
   const handleSendMessage = () => {
     if (message.trim()) {
@@ -62,7 +64,14 @@ export function ChatWindow({ conversationId }: ChatWindowProps) {
 
       {/* Messages */}
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
-        {chatMessages.length === 0 ? (
+        {isLoading ? (
+          <div className="flex-1 flex items-center justify-center">
+            <div className="text-center">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+              <p className="mt-2 text-sm text-gray-600">Cargando mensajes...</p>
+            </div>
+          </div>
+        ) : chatMessages.length === 0 ? (
           <div className="flex-1 flex items-center justify-center">
             <div className="text-center text-gray-500">
               <p className="text-sm">No hay mensajes en esta conversación</p>
@@ -91,8 +100,8 @@ export function ChatWindow({ conversationId }: ChatWindowProps) {
 
                 {/* Determinar si es mensaje del usuario (izquierda) o de la API (derecha) */}
                 {(() => {
-                  const isUserMessage = msg.sender === "userMessage"
-                  const isApiMessage = msg.sender === "apiMessage"
+                  const isUserMessage = msg.sender === "user"
+                  const isApiMessage = msg.sender === "agent"
                   
                   return (
                     <div className={`flex ${isUserMessage ? "justify-start" : "justify-end"}`}>

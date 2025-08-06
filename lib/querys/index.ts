@@ -17,6 +17,13 @@ export * from './customers'
 // Exportar todas las consultas de appointments
 export * from './appointments'
 
+// Exportar todas las consultas de usuarios
+export * from './users'
+
+// Re-exportar consultas N8N para mantener compatibilidad
+export { getUserMessagesN8N, getUserMessagesTest, getUsersByClinicN8N } from '../querys_n8n'
+export type { User } from '../querys_n8n'
+
 // Re-exportar tipos de esquemas para facilidad de uso
 export type { Customer } from '../../schemas/customers'
 export type { Message } from '../../schemas/messages'
