@@ -77,7 +77,7 @@ export function CalendarView() {
   const isToday = (date: Date) => isSameDay(date, new Date())
 
   return (
-    <div className="p-6 h-full">
+    <div className="p-6 h-full w-full">
       <Card className="h-full">
         <CardHeader>
           <div className="flex items-center justify-between">
