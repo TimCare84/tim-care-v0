@@ -3,7 +3,7 @@
 import { useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { ChevronLeft, ChevronRight } from 'lucide-react'
+import { ChevronLeft, ChevronRight, User, Clock, Stethoscope, Phone } from 'lucide-react' // Added icons
 import { format, startOfWeek, addDays, subDays, isSameDay, isSameMonth, isSameYear } from 'date-fns'
 import { es } from 'date-fns/locale' // Import Spanish locale
 
@@ -128,10 +128,10 @@ export function CalendarView() {
                         <div className="space-y-1">
                           {dayAppointments.map((apt, i) => (
                             <div key={i} className="text-xs bg-blue-100 text-blue-800 p-1 rounded">
-                              <div className="font-medium">{apt.patient}</div>
-                              <div>{apt.time}</div>
-                              <div>{apt.service}</div>
-                              <div>{apt.phone}</div>
+                              <div className="font-medium flex items-center gap-1"><User className="h-3 w-3" />{apt.patient}</div>
+                              <div className="flex items-center gap-1"><Clock className="h-3 w-3" />{apt.time}</div>
+                              <div className="flex items-center gap-1"><Stethoscope className="h-3 w-3" />{apt.service}</div>
+                              <div className="flex items-center gap-1"><Phone className="h-3 w-3" />{apt.phone}</div>
                             </div>
                           ))}
                         </div>
@@ -149,10 +149,10 @@ export function CalendarView() {
                   {mockAppointments[format(currentDate, "yyyy-MM-dd")]?.map((apt, i) => (
                     <Card key={i}>
                       <CardContent className="p-4 text-sm">
-                        <div className="font-medium text-base">{apt.patient}</div>
-                        <div className="text-gray-700">Hora: {apt.time}</div>
-                        <div className="text-gray-700">Servicio: {apt.service}</div>
-                        <div className="text-gray-700">Teléfono: {apt.phone}</div>
+                        <div className="font-medium text-base flex items-center gap-2"><User className="h-4 w-4" />{apt.patient}</div>
+                        <div className="text-gray-700 flex items-center gap-2"><Clock className="h-4 w-4" />Hora: {apt.time}</div>
+                        <div className="text-gray-700 flex items-center gap-2"><Stethoscope className="h-4 w-4" />Servicio: {apt.service}</div>
+                        <div className="text-gray-700 flex items-center gap-2"><Phone className="h-4 w-4" />Teléfono: {apt.phone}</div>
                       </CardContent>
                     </Card>
                   ))}
