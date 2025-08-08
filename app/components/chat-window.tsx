@@ -8,6 +8,7 @@ import { Send, Zap, Phone, Calendar, MapPin, FileText, CreditCard, Bot, User } f
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { useChatContext } from "./chat-context"
 import { getCustomerDisplayName, getUserInitials, formatMessageTime, formatLastUpdate } from "./chat-utils"
+import { useSearchParams } from "next/navigation"  // Add this import
 
 // Remover datos mock - ahora usamos el contexto
 
@@ -18,17 +19,75 @@ interface ChatWindowProps {
 export function ChatWindow({ conversationId }: ChatWindowProps) {
   const [message, setMessage] = useState("")
   const { messages, customers, loadingConversations } = useChatContext()
-  
+
+  const searchParams = useSearchParams()
+  const clinicId = searchParams.get('clinic_id')
+
   // Memoizar los datos específicos de esta conversación para evitar re-renderizados
   const chatMessages = useMemo(() => messages[conversationId] || [], [messages, conversationId])
   const customer = useMemo(() => customers[conversationId], [customers, conversationId])
   const isLoading = useMemo(() => loadingConversations[conversationId] || false, [loadingConversations, conversationId])
 
-  const handleSendMessage = () => {
-    if (message.trim()) {
-      // Here you would typically send the message to your backend
-      console.log("Sending message:", message)
+  const handleSendMessage = async () => {
+    if (!message.trim()) return
+
+    // Validar datos necesarios
+    if (!customer?.whatsapp_number) {
+      console.error("No se encontró el número de WhatsApp del cliente")
+      return
+    }
+    
+
+    if (!clinicId) {
+      console.error("No se encontró el ID de la clínica")
+      return
+    }
+
+    // Usando userId hardcodeado ya que el proyecto no cuenta con autenticación
+    const currentUserId = "51eae6e6-b29f-981e-cd02-d50bc8147fac"
+
+    try {
+      // Usar phoneNumberId proporcionado por el backend developer
+      // Este es el phoneNumberId confirmado para la clínica en producción
+      const phoneNumberId = 613102665225070
+
+      // Preparar el payload para enviar el mensaje
+      const messagePayload = {
+        toNumber: customer.whatsapp_number,
+        message: message.trim(),
+        phoneNumberId: phoneNumberId,
+        clinicId: clinicId,
+        userId: currentUserId
+      }
+
+      // Enviar el mensaje a través de la API interna
+      const response = await fetch('/api/messages/send', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(messagePayload)
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || 'Error al enviar mensaje')
+      }
+
+      const result = await response.json()
+      console.log("Mensaje enviado exitosamente:", result)
+      
+      // Limpiar el input
       setMessage("")
+      
+      // TODO: Actualizar la lista de mensajes con el mensaje enviado
+      // Esto podría hacerse agregando el mensaje al contexto local
+      // o recargando los mensajes desde el servidor
+
+    } catch (error) {
+      console.error("Error al enviar mensaje:", error)
+      // TODO: Mostrar notificación de error al usuario
+      alert(`Error al enviar mensaje: ${error instanceof Error ? error.message : 'Error desconocido'}`)
     }
   }
 
@@ -53,7 +112,7 @@ export function ChatWindow({ conversationId }: ChatWindowProps) {
           <div>
             <h3 className="font-medium text-gray-900">{getCustomerDisplayName(customer)}</h3>
             <p className="text-sm text-gray-500">
-              {customer?.last_interaction 
+              {customer?.last_interaction
                 ? `Última actividad: ${formatLastUpdate(customer.last_interaction)}`
                 : 'Estado desconocido'
               }
@@ -81,19 +140,19 @@ export function ChatWindow({ conversationId }: ChatWindowProps) {
         ) : (
           chatMessages.map((msg, index) => {
             const msgTime = formatMessageTime(msg.timestamp)
-            const showTimestamp = index === 0 || 
-              (chatMessages[index - 1].timestamp && 
-               new Date(chatMessages[index - 1].timestamp!).toDateString() !== new Date(msg.timestamp!).toDateString())
+            const showTimestamp = index === 0 ||
+              (chatMessages[index - 1].timestamp &&
+                new Date(chatMessages[index - 1].timestamp!).toDateString() !== new Date(msg.timestamp!).toDateString())
 
             return (
               <div key={msg.id}>
                 {showTimestamp && (
                   <div className="text-center text-xs text-gray-500 mb-4">
-                    {msg.timestamp ? new Date(msg.timestamp).toLocaleDateString('es-ES', { 
-                      weekday: 'long', 
-                      year: 'numeric', 
-                      month: 'long', 
-                      day: 'numeric' 
+                    {msg.timestamp ? new Date(msg.timestamp).toLocaleDateString('es-ES', {
+                      weekday: 'long',
+                      year: 'numeric',
+                      month: 'long',
+                      day: 'numeric'
                     }) : 'Fecha desconocida'}
                   </div>
                 )}
@@ -101,22 +160,19 @@ export function ChatWindow({ conversationId }: ChatWindowProps) {
                 {/* Determinar si es mensaje del usuario (izquierda) o de la API (derecha) */}
                 {(() => {
                   const isUserMessage = msg.sender === "user"
-                  const isApiMessage = msg.sender === "agent"
-                  
+
                   return (
                     <div className={`flex ${isUserMessage ? "justify-start" : "justify-end"}`}>
                       <div
-                        className={`flex items-start space-x-2 max-w-xs lg:max-w-md ${
-                          isUserMessage ? "flex-row" : "flex-row-reverse space-x-reverse"
-                        }`}
+                        className={`flex items-start space-x-2 max-w-xs lg:max-w-md ${isUserMessage ? "flex-row" : "flex-row-reverse space-x-reverse"
+                          }`}
                       >
                         <Avatar className="h-8 w-8">
                           <AvatarFallback
-                            className={`text-white font-medium ${
-                              isUserMessage
+                            className={`text-white font-medium ${isUserMessage
                                 ? "bg-gradient-to-br from-gray-400 to-gray-600"
                                 : "bg-gradient-to-br from-blue-400 to-blue-600"
-                            }`}
+                              }`}
                           >
                             {isUserMessage ? (
                               <User className="h-4 w-4" />
@@ -127,11 +183,10 @@ export function ChatWindow({ conversationId }: ChatWindowProps) {
                         </Avatar>
 
                         <div
-                          className={`rounded-lg p-3 ${
-                            isUserMessage 
-                              ? "bg-gray-100 text-gray-900" 
+                          className={`rounded-lg p-3 ${isUserMessage
+                              ? "bg-gray-100 text-gray-900"
                               : "bg-blue-500 text-white"
-                          }`}
+                            }`}
                         >
                           <p className="text-sm">{msg.content || 'Mensaje sin contenido'}</p>
                           <p className={`text-xs mt-1 ${isUserMessage ? "text-gray-500" : "text-blue-100"}`}>
@@ -171,7 +226,7 @@ export function ChatWindow({ conversationId }: ChatWindowProps) {
             placeholder="Escribe un mensaje..."
             value={message}
             onChange={(e) => setMessage(e.target.value)}
-            onKeyPress={(e) => e.key === "Enter" && handleSendMessage()}
+            onKeyDown={(e) => e.key === "Enter" && handleSendMessage()}
             className="flex-1"
           />
 
