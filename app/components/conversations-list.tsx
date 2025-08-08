@@ -22,9 +22,21 @@ interface ConversationsListProps {
 
 // Componente interno que usa useSearchParams
 function ConversationsListContent({ selectedConversation, onSelectConversation }: ConversationsListProps) {
-  const [searchTerm, setSearchTerm] = useState("")
+  const [searchTerm, setSearchTerm] = useState<string>("")
+  
+  // Handler seguro para cambios en el input de búsqueda
+  const handleSearchChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value ?? ""
+    setSearchTerm(value)
+  }, [])
+
+  // Valor seguro para searchTerm
+  const safeSearchTerm = useMemo(() => searchTerm ?? "", [searchTerm])
   const { chats, messages, loadMessagesForChat, loadUserMessages } = useChatContext()
   const searchParams = useSearchParams()
+  
+  // Asegurar que los props siempre tengan valores válidos
+  const safeSelectedConversation = selectedConversation || ""
   
   // Estado para manejar los últimos mensajes de cada chat
   const [lastMessages, setLastMessages] = useState<Record<string, string>>({})
@@ -36,7 +48,7 @@ function ConversationsListContent({ selectedConversation, onSelectConversation }
   const [totalPages, setTotalPages] = useState<number>(1)
   const [hasNext, setHasNext] = useState<boolean>(false)
   const [hasPrev, setHasPrev] = useState<boolean>(false)
-  const [loadingUsers, setLoadingUsers] = useState(false)
+  const [loadingUsers, setLoadingUsers] = useState<boolean>(false)
   const [usersError, setUsersError] = useState<string | null>(null)
 
   // Función para manejar la selección de conversación - Comentado temporalmente
@@ -201,7 +213,7 @@ function ConversationsListContent({ selectedConversation, onSelectConversation }
   const [loadingMessages, setLoadingMessages] = useState<string | null>(null)
 
   const filteredConversations = conversations.filter((conv) =>
-    conv.name.toLowerCase().includes(searchTerm.toLowerCase()),
+    conv.name.toLowerCase().includes(safeSearchTerm.toLowerCase()),
   )
 
   const inboxConversations = filteredConversations.filter((conv) => conv.status === "inbox")
@@ -216,6 +228,7 @@ function ConversationsListContent({ selectedConversation, onSelectConversation }
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
             <Input
               placeholder="Buscar usuarios..."
+              value=""
               disabled
               className="pl-10"
             />
@@ -240,6 +253,7 @@ function ConversationsListContent({ selectedConversation, onSelectConversation }
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
             <Input
               placeholder="Buscar usuarios..."
+              value=""
               disabled
               className="pl-10"
             />
@@ -264,8 +278,8 @@ function ConversationsListContent({ selectedConversation, onSelectConversation }
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
             <Input
               placeholder="Buscar usuarios..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
+              value={safeSearchTerm}
+              onChange={handleSearchChange}
               className="pl-10"
             />
           </div>
@@ -303,8 +317,8 @@ function ConversationsListContent({ selectedConversation, onSelectConversation }
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
           <Input
             placeholder="Buscar usuarios..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
+            value={safeSearchTerm}
+            onChange={handleSearchChange}
             className="pl-10"
           />
         </div>
@@ -528,6 +542,7 @@ export function ConversationsList({ selectedConversation, onSelectConversation }
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
             <Input
               placeholder="Buscar usuarios..."
+              value=""
               disabled
               className="pl-10"
             />
