@@ -12,18 +12,18 @@ import { ChatProvider } from "./components/chat-context"
 function MedicalCRMContent() {
   const [activeSection, setActiveSection] = useState("pacientes")
   const searchParams = useSearchParams()
+  const clinicId = searchParams.get('clinic_id')
 
   useEffect(() => {
-    const clinicId = searchParams.get('clinic_id')
     if (clinicId) {
       console.log('clinic_id:', clinicId)
     }
-  }, [searchParams])
+  }, [clinicId])
 
   const renderMainContent = () => {
     switch (activeSection) {
       case "dashboard":
-        return <Dashboard />
+        return <Dashboard clinicId={clinicId} />
       case "pacientes":
         return <ChatViewer />
       case "calendario":
