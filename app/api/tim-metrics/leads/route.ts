@@ -31,6 +31,7 @@ interface LeadMetrics {
       scheduled_paid: LeadStageMetric
       confirmed: LeadStageMetric
       attended: LeadStageMetric
+      stalled_leads: LeadStageMetric
       total: ValueWithTooltip
     }
   }
@@ -116,6 +117,12 @@ export async function GET(request: NextRequest) {
             description: 'Citas asistidas',
             percentage: '0.0',
             tooltip: 'No hay datos disponibles'
+          },
+          stalled_leads: {
+            value: 5,
+            description: 'Leads estancados sin respuesta en 1 hora',
+            percentage: '71.43',
+            tooltip: 'Leads que recibieron un mensaje del agente hace más de 1 hora pero no han respondido. Requieren seguimiento para evitar pérdida de conversión.'
           },
           total: {
             value: 0,

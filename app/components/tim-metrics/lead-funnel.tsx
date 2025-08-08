@@ -3,6 +3,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { Progress } from "@/components/ui/progress"
+import { AlertTriangle } from "lucide-react"
 import { LeadMetrics } from "./api-client"
 
 interface LeadFunnelProps {
@@ -90,6 +91,13 @@ export function LeadFunnel({ data, loading }: LeadFunnelProps) {
     }
   ]
 
+  const stalledLeads = {
+    value: data.lead_metrics.lead_stages.stalled_leads.value,
+    percentage: data.lead_metrics.lead_stages.stalled_leads.percentage,
+    description: data.lead_metrics.lead_stages.stalled_leads.description,
+    tooltip: data.lead_metrics.lead_stages.stalled_leads.tooltip
+  }
+
   const maxValue = Math.max(...stages.map(s => s.value))
 
   return (
@@ -99,6 +107,32 @@ export function LeadFunnel({ data, loading }: LeadFunnelProps) {
       </CardHeader>
       <CardContent>
         <div className="space-y-6">
+          {/* Alerta de Leads Estancados */}
+          {stalledLeads.value > 0 && (
+            <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+              <div className="flex items-start gap-3">
+                <AlertTriangle className="h-5 w-5 text-amber-600 mt-0.5 flex-shrink-0" />
+                <div className="flex-1">
+                  <div className="flex items-center justify-between">
+                    <h3 className="font-medium text-amber-900">Leads Estancados</h3>
+                    <div className="flex items-center gap-2">
+                      <span className="text-2xl font-bold text-amber-700">{stalledLeads.value}</span>
+                      <span className="text-sm text-amber-600">({stalledLeads.percentage}%)</span>
+                    </div>
+                  </div>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <p className="text-sm text-amber-800 mt-1 cursor-help">{stalledLeads.description}</p>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p className="max-w-xs">{stalledLeads.tooltip}</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </div>
+              </div>
+            </div>
+          )}
+
           {stages.map((stage, index) => (
             <FunnelStage
               key={stage.name}

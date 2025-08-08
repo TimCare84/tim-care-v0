@@ -126,6 +126,7 @@ interface LeadMetrics {
       scheduled_paid: LeadStageMetric
       confirmed: LeadStageMetric
       attended: LeadStageMetric
+      stalled_leads: LeadStageMetric
       total: ValueWithTooltip
     }
   }
