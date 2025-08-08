@@ -84,7 +84,7 @@ export function ChatProvider({ children }: ChatProviderProps) {
       // Intentar obtener información del usuario desde N8N
       let customerData: Customer
       try {
-        const users = await getUsersByClinicN8N(clinicId, 1, 100, true)
+        const { users } = await getUsersByClinicN8N(clinicId, 1, 100, true)
         const userInfo = users.find(user => user.id === userId)
         
         if (userInfo) {

@@ -2,9 +2,11 @@
 
 import React, { useState, useMemo, useEffect, useCallback, Suspense } from "react"
 import { Input } from "@/components/ui/input"
-import { Search, Bot, User } from "lucide-react"
+import { Search, Bot, User, ChevronLeft, ChevronRight } from "lucide-react"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useChatContext } from "./chat-context"
 import { transformChatToConversationUI, ConversationUIData } from "./chat-utils"
 import { getLastMessageByChat, getUsersByClinicN8N, getUserMessagesN8N, User as UserType } from "@/lib/querys"
@@ -29,6 +31,11 @@ function ConversationsListContent({ selectedConversation, onSelectConversation }
   
   // Estado para usuarios de la clínica
   const [clinicUsers, setClinicUsers] = useState<UserType[]>([])
+  const [page, setPage] = useState<number>(1)
+  const [limit, setLimit] = useState<number>(50)
+  const [totalPages, setTotalPages] = useState<number>(1)
+  const [hasNext, setHasNext] = useState<boolean>(false)
+  const [hasPrev, setHasPrev] = useState<boolean>(false)
   const [loadingUsers, setLoadingUsers] = useState(false)
   const [usersError, setUsersError] = useState<string | null>(null)
 
@@ -93,17 +100,22 @@ function ConversationsListContent({ selectedConversation, onSelectConversation }
         return
       }
 
-      // Solo cargar si no tenemos usuarios ya cargados
-      if (clinicUsers.length > 0) {
-        return
-      }
-
       setLoadingUsers(true)
       setUsersError(null)
       
       try {
-        const users = await getUsersByClinicN8N(clinicId, 1, 50, true)
+        const { users, pagination } = await getUsersByClinicN8N(clinicId, page, limit, true)
         setClinicUsers(users)
+        if (pagination) {
+          setTotalPages(pagination.totalPages)
+          setHasNext(pagination.hasNext)
+          setHasPrev(pagination.hasPrev)
+        } else {
+          // Fallback si no llega paginación
+          setTotalPages(1)
+          setHasNext(false)
+          setHasPrev(false)
+        }
       } catch (error) {
         console.error('Error loading clinic users:', error)
         setUsersError('Error al cargar usuarios de la clínica')
@@ -113,7 +125,7 @@ function ConversationsListContent({ selectedConversation, onSelectConversation }
     }
 
     loadClinicUsers()
-  }, [searchParams, clinicUsers.length]) // Depender de searchParams completo y clinicUsers.length
+  }, [searchParams, page, limit]) // recargar al cambiar página o límite
 
   // Cargar último mensaje para cada chat si no está en cache - Comentado temporalmente
   // React.useEffect(() => {
@@ -166,16 +178,23 @@ function ConversationsListContent({ selectedConversation, onSelectConversation }
     // })
 
     // Usar usuarios de N8N como conversaciones
-    return clinicUsers.map(user => ({
-      id: user.id,
-      name: user.user_name,
-      avatar: user.user_name.charAt(0).toUpperCase(),
-      lastMessage: `📱 ${user.whatsapp_number}`,
-      time: new Date(user.last_interaction).toLocaleDateString('es-ES'),
-      status: user.agent_active ? 'inbox' : 'ai',
-      needsIntervention: false,
-      unreadCount: 0
-    }))
+    return clinicUsers.map(user => {
+      const safeName = (user.user_name?.trim() || user.whatsapp_number || 'Usuario')
+      const safeAvatar = (safeName && safeName.length > 0 ? safeName[0] : 'U').toUpperCase()
+      const safeLastMessage = user.whatsapp_number ? `📱 ${user.whatsapp_number}` : ''
+      const safeTime = user.last_interaction ? new Date(user.last_interaction).toLocaleDateString('es-ES') : ''
+
+      return {
+        id: user.id,
+        name: safeName,
+        avatar: safeAvatar,
+        lastMessage: safeLastMessage,
+        time: safeTime,
+        status: user.agent_active ? 'inbox' : 'ai',
+        needsIntervention: false,
+        unreadCount: 0
+      }
+    })
   }, [clinicUsers]) // Cambiado de [chats, messages, lastMessages] a [clinicUsers]
 
   // Estado para indicar qué chat está cargando mensajes
@@ -441,6 +460,60 @@ function ConversationsListContent({ selectedConversation, onSelectConversation }
           </div>
         )}
       </div>
+
+      {/* Pagination Controls */}
+      {(hasNext || hasPrev || totalPages > 1) && (
+        <div className="border-t border-gray-200 bg-gray-50/30">
+          <div className="px-3 py-2 flex items-center justify-between">
+            <div className="flex items-center gap-1">
+              <Button
+                variant="ghost"
+                size="sm"
+                disabled={!hasPrev || loadingUsers}
+                onClick={() => setPage(prev => Math.max(1, prev - 1))}
+                className="h-7 w-7 p-0"
+              >
+                <ChevronLeft className="h-3 w-3" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                disabled={!hasNext || loadingUsers}
+                onClick={() => setPage(prev => prev + 1)}
+                className="h-7 w-7 p-0"
+              >
+                <ChevronRight className="h-3 w-3" />
+              </Button>
+            </div>
+            
+            <div className="flex items-center gap-3">
+              <div className="text-xs text-muted-foreground">
+                Página <span className="font-medium text-foreground">{page}</span> de <span className="font-medium text-foreground">{totalPages}</span>
+              </div>
+              
+              <div className="flex items-center gap-1">
+                <label className="text-xs text-muted-foreground whitespace-nowrap">
+                  Por página:
+                </label>
+                <Select
+                  value={limit.toString()}
+                  onValueChange={(value) => { setPage(1); setLimit(Number(value)) }}
+                  disabled={loadingUsers}
+                >
+                  <SelectTrigger className="h-6 w-16 text-xs">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="25">25</SelectItem>
+                    <SelectItem value="50">50</SelectItem>
+                    <SelectItem value="100">100</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
