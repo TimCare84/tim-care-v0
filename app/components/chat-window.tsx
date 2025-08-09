@@ -7,7 +7,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Send, Zap, Phone, Calendar, MapPin, FileText, CreditCard, Bot, User } from "lucide-react"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { useChatContext } from "./chat-context"
-import { getCustomerDisplayName, getUserInitials, formatMessageTime, formatLastUpdate } from "./chat-utils"
+import { getCustomerDisplayName, getUserInitials, formatMessageTime, formatMessageDate, formatLastUpdate } from "./chat-utils"
 
 interface ChatWindowProps {
   conversationId: string
@@ -396,20 +396,24 @@ export function ChatWindow({ conversationId }: ChatWindowProps) {
         ) : (
           chatMessages.map((msg, index) => {
             const msgTime = formatMessageTime(msg.timestamp)
+            
+            // Función para obtener solo la fecha del día (sin hora)
+            const getDateOnly = (timestamp: Date | string | undefined) => {
+              if (!timestamp) return new Date(0) // Fecha por defecto si no hay timestamp
+              const date = new Date(timestamp)
+              return new Date(date.getFullYear(), date.getMonth(), date.getDate())
+            }
+            
+            // Mostrar timestamp solo cuando cambia el día
             const showTimestamp = index === 0 || 
               (chatMessages[index - 1].timestamp && 
-               new Date(chatMessages[index - 1].timestamp!).toDateString() !== new Date(msg.timestamp!).toDateString())
+               getDateOnly(chatMessages[index - 1].timestamp).getTime() !== getDateOnly(msg.timestamp).getTime())
 
             return (
               <div key={msg.id}>
                 {showTimestamp && (
                   <div className="text-center text-xs text-gray-500 mb-4">
-                    {msg.timestamp ? new Date(msg.timestamp).toLocaleDateString('es-ES', { 
-                      weekday: 'long', 
-                      year: 'numeric', 
-                      month: 'long', 
-                      day: 'numeric' 
-                    }) : 'Fecha desconocida'}
+                    {formatMessageDate(msg.timestamp)}
                   </div>
                 )}
 

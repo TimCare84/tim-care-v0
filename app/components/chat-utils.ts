@@ -27,11 +27,87 @@ export function formatLastUpdate(dateString?: string): string {
 export function formatMessageTime(timestamp?: Date | string): string {
   if (!timestamp) return ''
   
-  const date = new Date(timestamp)
-  return date.toLocaleTimeString('es-ES', { 
-    hour: '2-digit', 
+  let date: Date
+  
+  // Si ya es string, convertirlo a Date
+  if (typeof timestamp === 'string') {
+    date = new Date(timestamp)
+  } else {
+    date = timestamp
+  }
+  
+  // Verificar que la fecha sea válida
+  if (isNaN(date.getTime())) {
+    return ''
+  }
+  
+  // Mostrar en zona horaria local de la computadora en formato 24 horas
+  return date.toLocaleTimeString('es-MX', {
+    hour: '2-digit',
     minute: '2-digit',
     hour12: false
+  })
+}
+
+// Función para formatear la fecha del día de los mensajes con más información
+export function formatMessageDate(timestamp?: Date | string): string {
+  if (!timestamp) return ''
+  
+  let date: Date
+  
+  // Si ya es string, convertirlo a Date
+  if (typeof timestamp === 'string') {
+    date = new Date(timestamp)
+  } else {
+    date = timestamp
+  }
+  
+  // Verificar que la fecha sea válida
+  if (isNaN(date.getTime())) {
+    return ''
+  }
+  
+  // Obtener la fecha actual
+  const now = new Date()
+  
+  // Obtener solo la fecha (sin hora) para comparaciones
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  const messageDate = new Date(date.getFullYear(), date.getMonth(), date.getDate())
+  
+  // Si es hoy
+  if (messageDate.getTime() === today.getTime()) {
+    return 'Hoy'
+  }
+  
+  // Si es ayer
+  const yesterday = new Date(today.getTime() - 24 * 60 * 60 * 1000)
+  if (messageDate.getTime() === yesterday.getTime()) {
+    return 'Ayer'
+  }
+  
+  // Si es esta semana
+  const weekAgo = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000)
+  if (messageDate.getTime() >= weekAgo.getTime()) {
+    return date.toLocaleDateString('es-MX', {
+      weekday: 'long',
+      month: 'short',
+      day: 'numeric'
+    })
+  }
+  
+  // Si es este año
+  if (date.getFullYear() === now.getFullYear()) {
+    return date.toLocaleDateString('es-MX', {
+      month: 'long',
+      day: 'numeric'
+    })
+  }
+  
+  // Si es otro año
+  return date.toLocaleDateString('es-MX', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric'
   })
 }
 
