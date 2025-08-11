@@ -1,16 +1,34 @@
 "use client"
 
-import { useState, useMemo } from "react"
+import { useState, useMemo, useRef, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
-import { Send, Zap, Phone, Calendar, MapPin, FileText, CreditCard, Bot, User } from "lucide-react"
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import { Send, Zap, Phone, Calendar, MapPin, FileText, CreditCard, Bot, User, LifeBuoy, ChevronLeft, ChevronRight, MessageSquare } from "lucide-react"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSub, DropdownMenuSubContent, DropdownMenuSubTrigger } from "@/components/ui/dropdown-menu"
+import { Dialog, DialogContent } from "@/components/ui/dialog"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useChatContext } from "./chat-context"
 import { getCustomerDisplayName, getUserInitials, formatMessageTime, formatLastUpdate } from "./chat-utils"
 import { useSearchParams } from "next/navigation"  // Add this import
+import { useSearchParams } from "next/navigation"  // Add this import
 
 // Remover datos mock - ahora usamos el contexto
+
+const rescueTemplates = [
+  "Si no tienes dudas adicionales, nos encantaría poder atenderte para enseñarte que somos top. ¿Te gustaría que busquemos algún horario para agendarte una cita? 🤩",
+  "Creo que se me olvidó comentarte de nuestra garantía del 100%. Estamos muy seguros de que saldrás contento de tu cita. Aprovecho para comentarte de nuestra garantía del 100%!",
+  "Me confirmas en cuanto quede el pago por favor.",
+  "Tuviste alguna complicación con el pago o todo bien? Me confirmas en cuanto puedas para que no te ganen el espacio.",
+]
+
+const promotionTemplates = [
+  "🎉 ¡Oferta especial! Este mes tenemos 20% de descuento en consultas de primera vez. ¿Te interesa agendar?",
+  "💫 Promoción limitada: Paquete de 3 consultas por el precio de 2. Válido hasta fin de mes.",
+  "🌟 ¡Descuento del 15% para pacientes que refieran a un amigo! Ambos se benefician.",
+  "🎁 Oferta de temporada: Consulta + exámenes básicos con 25% de descuento. ¡No te lo pierdas!",
+  "⚡ Flash sale: 30% off en tratamientos estéticos este fin de semana únicamente.",
+]
 
 interface ChatWindowProps {
   conversationId: string
@@ -19,6 +37,14 @@ interface ChatWindowProps {
 export function ChatWindow({ conversationId }: ChatWindowProps) {
   const [message, setMessage] = useState("")
   const { messages, customers, loadingConversations } = useChatContext()
+  const messagesEndRef = useRef<HTMLDivElement>(null)
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
+
+  const [isRescueModalOpen, setIsRescueModalOpen] = useState(false)
+  const [isPromotionModalOpen, setIsPromotionModalOpen] = useState(false)
+  const [selectedReason, setSelectedReason] = useState("")
+  const [currentRescueTemplateIndex, setCurrentRescueTemplateIndex] = useState(0)
+  const [currentPromotionTemplateIndex, setCurrentPromotionTemplateIndex] = useState(0)
 
   const searchParams = useSearchParams()
   const clinicId = searchParams.get('clinic_id')
@@ -28,16 +54,18 @@ export function ChatWindow({ conversationId }: ChatWindowProps) {
   const customer = useMemo(() => customers[conversationId], [customers, conversationId])
   const isLoading = useMemo(() => loadingConversations[conversationId] || false, [loadingConversations, conversationId])
 
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
+  }, [chatMessages])
+
   const handleSendMessage = async () => {
     if (!message.trim()) return
-
     // Validar datos necesarios
     if (!customer?.whatsapp_number) {
+      
       console.error("No se encontró el número de WhatsApp del cliente")
       return
     }
-    
-
     if (!clinicId) {
       console.error("No se encontró el ID de la clínica")
       return
@@ -47,7 +75,7 @@ export function ChatWindow({ conversationId }: ChatWindowProps) {
     const currentUserId = "51eae6e6-b29f-981e-cd02-d50bc8147fac"
 
     try {
-      // Usar phoneNumberId proporcionado por el backend developer
+      // Usar phoneNumberId proporcionado 
       // Este es el phoneNumberId confirmado para la clínica en producción
       const phoneNumberId = 613102665225070
 
@@ -91,12 +119,90 @@ export function ChatWindow({ conversationId }: ChatWindowProps) {
     }
   }
 
+  const handleRescueTemplateSelect = (template: string) => {
+    setMessage(template)
+    setIsRescueModalOpen(false)
+    setSelectedReason("")
+    setCurrentRescueTemplateIndex(0)
+  }
+
+  const handlePromotionTemplateSelect = (template: string) => {
+    setMessage(template)
+    setIsPromotionModalOpen(false)
+    setCurrentPromotionTemplateIndex(0)
+  }
+
+  const handlePrevRescueTemplate = () => {
+    setCurrentRescueTemplateIndex(Math.max(0, currentRescueTemplateIndex - 1))
+  }
+
+  const handleNextRescueTemplate = () => {
+    setCurrentRescueTemplateIndex(Math.min(rescueTemplates.length - 1, currentRescueTemplateIndex + 1))
+  }
+
+  const handlePrevPromotionTemplate = () => {
+    setCurrentPromotionTemplateIndex(Math.max(0, currentPromotionTemplateIndex - 1))
+  }
+
+  const handleNextPromotionTemplate = () => {
+    setCurrentPromotionTemplateIndex(Math.min(promotionTemplates.length - 1, currentPromotionTemplateIndex + 1))
+  }
+
+  const handleLocationAddress = () => {
+    setMessage("Dirección y ubicación: Av. Río Churubusco 188, Col. El Prado, Iztapalapa, C.P. 09480 Ciudad de México. Mira, te comparto nuestra ubicación: https://maps.app.goo.gl/6GHYhVfsxE2NZuQB9")
+  }
+
+  const handleLocationDirections = () => {
+    setMessage("Indicaciones y referencias: Muy cerca del Metro Ermita (línea azul y dorada), entre Ermita y General Anaya. Estamos justo enfrente de la Cineteca Nacional de las Artes, ¡muy fácil de llegar!")
+  }
+
+  const handlePaymentLink = () => {
+    setMessage("Te comparto el enlace para realizar tu pago de forma segura: https://pay.timcare.com/secure-payment/abc123. Una vez completado el pago, tu cita quedará confirmada automáticamente.")
+  }
+
   const quickActions = [
-    { icon: Phone, label: "Llamar a paciente", action: () => console.log("Calling patient") },
-    { icon: Calendar, label: "Agendar cita", action: () => console.log("Scheduling appointment") },
-    { icon: MapPin, label: "Enviar ubicación", action: () => console.log("Sending location") },
-    { icon: FileText, label: "Enviar expediente", action: () => console.log("Sending medical record") },
-    { icon: CreditCard, label: "Enviar enlace de pago", action: () => console.log("Sending payment link") },
+    {
+      icon: Calendar,
+      label: "Agendar cita",
+      action: () => console.log("Scheduling appointment"),
+    },
+    {
+      icon: Phone,
+      label: "Llamar",
+      action: () => console.log("Calling patient"),
+    },
+    {
+      icon: MapPin,
+      label: "Enviar ubicación",
+      hasSubmenu: true,
+      submenu: [
+        {
+          label: "Enviar Dirección y ubicación Google Maps",
+          action: handleLocationAddress,
+        },
+        {
+          label: "Enviar indicaciones para llegar y referencias",
+          action: handleLocationDirections,
+        },
+      ],
+    },
+    {
+      icon: CreditCard,
+      label: "Enviar enlace de pago",
+      action: handlePaymentLink,
+    },
+    {
+      icon: LifeBuoy,
+      label: "Rescate de abandono",
+      action: () => setIsRescueModalOpen(true),
+      special: true,
+    },
+    {
+      icon: MessageSquare,
+      label: "Promociones y ofertas",
+      action: () => setIsPromotionModalOpen(true),
+      special: false,
+    },
   ]
 
   return (
@@ -213,11 +319,32 @@ export function ChatWindow({ conversationId }: ChatWindowProps) {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="start" className="w-56">
-              {quickActions.map((action, index) => (
-                <DropdownMenuItem key={index} onClick={action.action}>
-                  <action.icon className="h-4 w-4 mr-2" />
-                  {action.label}
-                </DropdownMenuItem>
+              {quickActions.map((
+                action, index) => (
+                action.hasSubmenu ? (
+                  <DropdownMenuSub key={index}>
+                    <DropdownMenuSubTrigger>
+                      <action.icon className="h-4 w-4 mr-2" />
+                      {action.label}
+                    </DropdownMenuSubTrigger>
+                    <DropdownMenuSubContent>
+                      {action.submenu?.map((subAction, subIndex) => (
+                        <DropdownMenuItem key={subIndex} onClick={subAction.action}>
+                          {subAction.label}
+                        </DropdownMenuItem>
+                      ))}
+                    </DropdownMenuSubContent>
+                  </DropdownMenuSub>
+                ) : (
+                  <DropdownMenuItem 
+                    key={index} 
+                    onClick={action.action}
+                    className={action.special ? "bg-orange-50 text-orange-700 hover:bg-orange-100" : ""}
+                  >
+                    <action.icon className={`h-4 w-4 mr-2 ${action.special ? "text-orange-600" : ""}`} />
+                    {action.label}
+                  </DropdownMenuItem>
+                )
               ))}
             </DropdownMenuContent>
           </DropdownMenu>
