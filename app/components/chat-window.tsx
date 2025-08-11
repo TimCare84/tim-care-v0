@@ -2,15 +2,16 @@
 
 import { useState, useMemo, useEffect, useRef, useCallback } from "react"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
-import { Send, Zap, Phone, Calendar, MapPin, FileText, CreditCard, Bot, User, LifeBuoy, ChevronLeft, ChevronRight, MessageSquare } from "lucide-react"
+import { Send, Zap, Phone, Calendar, MapPin, CreditCard, Bot, User, LifeBuoy, ChevronLeft, ChevronRight, MessageSquare, Hand } from "lucide-react"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSub, DropdownMenuSubContent, DropdownMenuSubTrigger } from "@/components/ui/dropdown-menu"
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { Dialog, DialogContent } from "@/components/ui/dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useChatContext } from "./chat-context"
-import { getCustomerDisplayName, getUserInitials, formatMessageTime, formatLastUpdate } from "./chat-utils"
+import { getCustomerDisplayName, getUserInitials, formatMessageTime } from "./chat-utils"
 import { useSearchParams } from "next/navigation"  // Add this import
+
 
 // Remover datos mock - ahora usamos el contexto
 
@@ -61,6 +62,8 @@ export function ChatWindow({ conversationId }: ChatWindowProps) {
   const [selectedReason, setSelectedReason] = useState("")
   const [currentRescueTemplateIndex, setCurrentRescueTemplateIndex] = useState(0)
   const [currentPromotionTemplateIndex, setCurrentPromotionTemplateIndex] = useState(0)
+  const [humanIntervention, setHumanIntervention] = useState(false)
+  const [aiMode, setAiMode] = useState(false)
 
   const searchParams = useSearchParams()
   const clinicId = searchParams.get('clinic_id')
@@ -359,69 +362,97 @@ export function ChatWindow({ conversationId }: ChatWindowProps) {
       return () => clearTimeout(timer)
     }
   }, [chatMessages.length, isInitialLoad, isLoading])
+  
+  // AI conversation logic - based on customer agent_active property
+  const isAiConversation = ((customer?.agent_active && !humanIntervention) || aiMode)
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
   }, [chatMessages])
 
   const handleSendMessage = async () => {
-    if (!message.trim()) return
-    // Validar datos necesarios
-    if (!customer?.whatsapp_number) {
-      
-      console.error("No se encontró el número de WhatsApp del cliente")
-      return
-    }
-    if (!clinicId) {
-      console.error("No se encontró el ID de la clínica")
-      return
-    }
-
-    // Usando userId hardcodeado ya que el proyecto no cuenta con autenticación
-    const currentUserId = "51eae6e6-b29f-981e-cd02-d50bc8147fac"
-
-    try {
-      // Usar phoneNumberId proporcionado 
-      // Este es el phoneNumberId confirmado para la clínica en producción
-      const phoneNumberId = 613102665225070
-
-      // Preparar el payload para enviar el mensaje
-      const messagePayload = {
-        toNumber: customer.whatsapp_number,
-        message: message.trim(),
-        phoneNumberId: phoneNumberId,
-        clinicId: clinicId,
-        userId: currentUserId
+    if (message.trim() && (!isAiConversation || humanIntervention)) {
+      // Validar datos necesarios
+      if (!customer?.whatsapp_number) {
+        
+        console.error("No se encontró el número de WhatsApp del cliente")
+        return
+      }
+      if (!clinicId) {
+        console.error("No se encontró el ID de la clínica")
+        return
       }
 
-      // Enviar el mensaje a través de la API interna
-      const response = await fetch('/api/messages/send', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(messagePayload)
-      })
+      // Usando userId hardcodeado ya que el proyecto no cuenta con autenticación
+      const currentUserId = "51eae6e6-b29f-981e-cd02-d50bc8147fac"
 
-      if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.error || 'Error al enviar mensaje')
+      try {
+        // Usar phoneNumberId proporcionado 
+        // Este es el phoneNumberId confirmado para la clínica en producción
+        const phoneNumberId = 613102665225070
+
+        // Preparar el payload para enviar el mensaje
+        const messagePayload = {
+          toNumber: customer.whatsapp_number,
+          message: message.trim(),
+          phoneNumberId: phoneNumberId,
+          clinicId: clinicId,
+          userId: currentUserId
+        }
+
+        // Enviar el mensaje a través de la API interna
+        const response = await fetch('/api/messages/send', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(messagePayload)
+        })
+
+        if (!response.ok) {
+          const errorData = await response.json()
+          throw new Error(errorData.error || 'Error al enviar mensaje')
+        }
+
+        const result = await response.json()
+        console.log("Mensaje enviado exitosamente:", result)
+        
+        // Limpiar el input
+        setMessage("")
+        
+        // Reset textarea height
+        if (textareaRef.current) {
+          textareaRef.current.style.height = "auto"
+        }
+        
+        // TODO: Actualizar la lista de mensajes con el mensaje enviado
+        // Esto podría hacerse agregando el mensaje al contexto local
+        // o recargando los mensajes desde el servidor
+
+      } catch (error) {
+        console.error("Error al enviar mensaje:", error)
+        // TODO: Mostrar notificación de error al usuario
+        alert(`Error al enviar mensaje: ${error instanceof Error ? error.message : 'Error desconocido'}`)
       }
+    }
+  }
 
-      const result = await response.json()
-      console.log("Mensaje enviado exitosamente:", result)
-      
-      // Limpiar el input
-      setMessage("")
-      
-      // TODO: Actualizar la lista de mensajes con el mensaje enviado
-      // Esto podría hacerse agregando el mensaje al contexto local
-      // o recargando los mensajes desde el servidor
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault()
+      handleSendMessage()
+    }
+  }
 
-    } catch (error) {
-      console.error("Error al enviar mensaje:", error)
-      // TODO: Mostrar notificación de error al usuario
-      alert(`Error al enviar mensaje: ${error instanceof Error ? error.message : 'Error desconocido'}`)
+  const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setMessage(e.target.value)
+
+    // Auto-resize textarea with max height of 2 lines
+    if (textareaRef.current) {
+      textareaRef.current.style.height = "auto"
+      const scrollHeight = textareaRef.current.scrollHeight
+      const maxHeight = 48 // Approximately 2 lines
+      textareaRef.current.style.height = `${Math.min(scrollHeight, maxHeight)}px`
     }
   }
 
@@ -452,6 +483,16 @@ export function ChatWindow({ conversationId }: ChatWindowProps) {
 
   const handleNextPromotionTemplate = () => {
     setCurrentPromotionTemplateIndex(Math.min(promotionTemplates.length - 1, currentPromotionTemplateIndex + 1))
+  }
+
+  const handleHumanIntervention = () => {
+    setHumanIntervention(true)
+    setAiMode(false)
+  }
+
+  const handleActivateAI = () => {
+    setAiMode(true)
+    setHumanIntervention(false)
   }
 
   const handleLocationAddress = () => {
@@ -523,12 +564,19 @@ export function ChatWindow({ conversationId }: ChatWindowProps) {
           </Avatar>
           <div>
             <h3 className="font-medium text-gray-900">{getCustomerDisplayName(customer)}</h3>
-            <p className="text-sm text-gray-500">
-              {customer?.last_interaction
-                ? `Última actividad: ${formatLastUpdate(customer.last_interaction)}`
-                : 'Estado desconocido'
-              }
-            </p>
+            <div className="flex items-center space-x-2">
+              {isAiConversation ? (
+                <>
+                  <Bot className="h-4 w-4 text-green-600" />
+                  <span className="text-sm text-green-600">Gestionado por Agente AI</span>
+                </>
+              ) : (
+                <>
+                  <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                  <span className="text-sm text-gray-500">En línea</span>
+                </>
+              )}
+            </div>
           </div>
         </div>
       </div>
@@ -643,59 +691,247 @@ export function ChatWindow({ conversationId }: ChatWindowProps) {
         </div>
       )}
 
-      {/* Message Input */}
+      {/* Input Area */}
       <div className="p-4 border-t border-gray-200 bg-white">
-        <div className="flex items-center space-x-2">
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm">
-                <Zap className="h-4 w-4" />
+        {isAiConversation ? (
+          /* AI Status Indicator with Emergency Button */
+          <div className="bg-white rounded-lg border border-gray-200 p-4">
+            <div className="flex items-center justify-between">
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleHumanIntervention}
+                      className="bg-red-50 border-red-200 hover:bg-red-100"
+                    >
+                      <Hand className="h-4 w-4 text-red-600" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Intervención humana</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+              
+              <div className="flex items-center justify-center space-x-3 flex-1">
+                <div className="relative">
+                  <Bot className="h-6 w-6 text-gray-400 animate-pulse" />
+                  <div className="absolute -top-1 -right-1 w-3 h-3 bg-green-500 rounded-full animate-ping"></div>
+                </div>
+                <p className="text-gray-500 text-sm animate-pulse">El agente AI está trabajando en la respuesta...</p>
+              </div>
+              
+              <div className="w-10"></div> {/* Spacer to balance the layout */}
+            </div>
+          </div>
+        ) : (
+          /* Human Input */
+          <div className="space-y-2">
+            <div className="flex items-end space-x-2">
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="sm">
+
+                    <Zap className="h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start" className="w-56">
+                  {quickActions.map((action, index) => (
+                    action.hasSubmenu ? (
+                      <DropdownMenuSub key={index}>
+                        <DropdownMenuSubTrigger>
+                          <action.icon className="h-4 w-4 mr-2" />
+                          {action.label}
+                        </DropdownMenuSubTrigger>
+                        <DropdownMenuSubContent>
+                          {action.submenu?.map((subAction, subIndex) => (
+                            <DropdownMenuItem key={subIndex} onClick={subAction.action}>
+                              {subAction.label}
+                            </DropdownMenuItem>
+                          ))}
+                        </DropdownMenuSubContent>
+                      </DropdownMenuSub>
+                    ) : (
+                      <DropdownMenuItem 
+                        key={index} 
+                        onClick={action.action}
+                        className={action.special ? "bg-orange-50 text-orange-700 hover:bg-orange-100" : ""}
+                      >
+                        <action.icon className={`h-4 w-4 mr-2 ${action.special ? "text-orange-600" : ""}`} />
+                        {action.label}
+                      </DropdownMenuItem>
+                    )
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
+
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button variant="outline" size="sm" onClick={handleActivateAI}>
+                      <Bot className="h-4 w-4" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Activar Agente AI</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+
+              <textarea
+                ref={textareaRef}
+                placeholder="Escribe un mensaje..."
+                value={message}
+                onChange={handleInputChange}
+                onKeyDown={handleKeyDown}
+                className="flex-1 resize-none rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent min-h-[40px] max-h-[48px] overflow-y-auto"
+                rows={1}
+              />
+
+              <Button onClick={handleSendMessage} size="sm" className="self-end">
+                <Send className="h-4 w-4" />
               </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="start" className="w-56">
-              {quickActions.map((
-                action, index) => (
-                action.hasSubmenu ? (
-                  <DropdownMenuSub key={index}>
-                    <DropdownMenuSubTrigger>
-                      <action.icon className="h-4 w-4 mr-2" />
-                      {action.label}
-                    </DropdownMenuSubTrigger>
-                    <DropdownMenuSubContent>
-                      {action.submenu?.map((subAction, subIndex) => (
-                        <DropdownMenuItem key={subIndex} onClick={subAction.action}>
-                          {subAction.label}
-                        </DropdownMenuItem>
-                      ))}
-                    </DropdownMenuSubContent>
-                  </DropdownMenuSub>
-                ) : (
-                  <DropdownMenuItem 
-                    key={index} 
-                    onClick={action.action}
-                    className={action.special ? "bg-orange-50 text-orange-700 hover:bg-orange-100" : ""}
-                  >
-                    <action.icon className={`h-4 w-4 mr-2 ${action.special ? "text-orange-600" : ""}`} />
-                    {action.label}
-                  </DropdownMenuItem>
-                )
-              ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
+            </div>
 
-          <Input
-            placeholder="Escribe un mensaje..."
-            value={message}
-            onChange={(e) => setMessage(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && handleSendMessage()}
-            className="flex-1"
-          />
-
-          <Button onClick={handleSendMessage} size="sm">
-            <Send className="h-4 w-4" />
-          </Button>
-        </div>
+            {/* Keyboard shortcuts hint */}
+            <div className="text-xs text-gray-400 text-center">
+              <span>Presiona Enter para enviar o Shift + Enter para nueva línea</span>
+            </div>
+          </div>
+        )}
       </div>
+
+      {/* Rescue Modal */}
+      <Dialog open={isRescueModalOpen} onOpenChange={setIsRescueModalOpen}>
+        <DialogContent className="max-w-5xl w-full p-0">
+          <div className="p-8 space-y-6">
+            {/* Top row */}
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-3">
+                <LifeBuoy className="h-5 w-5 text-orange-600" />
+                <h3 className="text-lg font-medium">Selecciona motivo de abandono:</h3>
+              </div>
+              <Select value={selectedReason} onValueChange={setSelectedReason}>
+                <SelectTrigger className="w-64">
+                  <SelectValue placeholder="Motivo" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="abandono">Abandono de conversación</SelectItem>
+                  <SelectItem value="falta-pago">Falta de pago</SelectItem>
+                </SelectContent>
+              </Select>
+
+            </div>
+
+            {/* Middle row - Template cards */}
+            <div className="space-y-4">
+              <div className="relative">
+                <div className="flex space-x-4 overflow-hidden">
+                  {rescueTemplates.slice(currentRescueTemplateIndex, currentRescueTemplateIndex + 3).map((template, index) => (
+                    <div
+                      key={currentRescueTemplateIndex + index}
+                      onClick={() => handleRescueTemplateSelect(template)}
+                      className={`flex-shrink-0 p-6 border rounded-lg cursor-pointer hover:bg-gray-50 transition-colors ${
+                        index === 2 ? "w-48 opacity-50" : "w-80"
+                      }`}
+                    >
+                      <p className="text-sm italic text-gray-700 leading-relaxed">{template}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* Bottom row */}
+            <div className="flex items-center justify-between pt-4">
+              <div className="text-sm">
+                <span className="font-medium text-black">{rescueTemplates.length}</span>
+                <span className="text-gray-500 ml-1">results</span>
+              </div>
+              <div className="flex items-center space-x-2">
+                <Button variant="outline" size="sm" onClick={handlePrevRescueTemplate} disabled={currentRescueTemplateIndex === 0}>
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleNextRescueTemplate}
+                  disabled={currentRescueTemplateIndex >= rescueTemplates.length - 1}
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Promotion Modal */}
+      <Dialog open={isPromotionModalOpen} onOpenChange={setIsPromotionModalOpen}>
+        <DialogContent className="max-w-5xl w-full p-0">
+          <div className="p-8 space-y-6">
+            {/* Top row */}
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-3">
+                <MessageSquare className="h-5 w-5 text-blue-600" />
+                <h3 className="text-lg font-medium">Selecciona promoción u oferta:</h3>
+              </div>
+              <Select>
+                <SelectTrigger className="w-64">
+                  <SelectValue placeholder="Tipo de promoción" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="descuentos">Descuentos</SelectItem>
+                  <SelectItem value="paquetes">Paquetes especiales</SelectItem>
+                  <SelectItem value="temporada">Ofertas de temporada</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Middle row - Template cards */}
+            <div className="space-y-4">
+              <div className="relative">
+                <div className="flex space-x-4 overflow-hidden">
+                  {promotionTemplates.slice(currentPromotionTemplateIndex, currentPromotionTemplateIndex + 3).map((template, index) => (
+                    <div
+                      key={currentPromotionTemplateIndex + index}
+                      onClick={() => handlePromotionTemplateSelect(template)}
+                      className={`flex-shrink-0 p-6 border rounded-lg cursor-pointer hover:bg-gray-50 transition-colors ${
+                        index === 2 ? "w-48 opacity-50" : "w-80"
+                      }`}
+                    >
+                      <p className="text-sm italic text-gray-700 leading-relaxed">{template}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* Bottom row */}
+            <div className="flex items-center justify-between pt-4">
+              <div className="text-sm">
+                <span className="font-medium text-black">{promotionTemplates.length}</span>
+                <span className="text-gray-500 ml-1">results</span>
+              </div>
+              <div className="flex items-center space-x-2">
+                <Button variant="outline" size="sm" onClick={handlePrevPromotionTemplate} disabled={currentPromotionTemplateIndex === 0}>
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleNextPromotionTemplate}
+                  disabled={currentPromotionTemplateIndex >= promotionTemplates.length - 1}
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
