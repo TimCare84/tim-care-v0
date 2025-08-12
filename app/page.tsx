@@ -37,7 +37,7 @@ function MedicalCRMContent() {
     <ChatProvider>
       <SidebarProvider defaultOpen={true}>
         <div className="flex h-screen w-screen bg-gray-50">
-          <Sidebar activeSection={activeSection} setActiveSection={setActiveSection} />
+          <Sidebar activeSection={activeSection} setActiveSection={setActiveSection} clinicId={clinicId} />
           {renderMainContent()}
         </div>
       </SidebarProvider>

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import {
   Home,
   MessageCircle,
@@ -21,6 +21,8 @@ import { Badge } from "@/components/ui/badge"
 import { useSidebar } from "@/components/ui/sidebar"
 import { Dashboard } from "./dashboard"
 import { CalendarView } from "./calendar-view"
+import { getClinicById } from "@/lib/querys/clinics"
+import type { Clinic } from "@/lib/querys/clinics"
 
 const navigationItems = [
   {
@@ -54,12 +56,23 @@ const navigationItems = [
 type SidebarProps = {
   activeSection: string;
   setActiveSection: React.Dispatch<React.SetStateAction<string>>;
+  clinicId: string | null;
 };
 
-export function Sidebar({ activeSection, setActiveSection }: SidebarProps) {
+export function Sidebar({ activeSection, setActiveSection, clinicId }: SidebarProps) {
   const { state, toggleSidebar } = useSidebar()
   const [activeSubcategory, setActiveSubcategory] = useState("todos")
+  const [clinic, setClinic] = useState<Clinic | null>(null)
   const isCollapsed = state === "collapsed"
+
+  useEffect(() => {
+    if (clinicId) {
+      getClinicById(clinicId)
+        .then(setClinic)
+        .catch(console.error)
+    }
+    
+  }, [clinicId])
 
   return (
     <div
@@ -115,7 +128,7 @@ export function Sidebar({ activeSection, setActiveSection }: SidebarProps) {
         <div className="p-4 border-t border-gray-200 mt-auto">
           <Button variant="ghost" className={`w-full justify-start ${isCollapsed ? "px-2" : "px-3"}`}>
             <User className="h-4 w-4" />
-            {!isCollapsed && <span className="ml-2">Dr. María González</span>}
+            {!isCollapsed && <span className="ml-2">{clinic?.clinic_name || "Clínica"}</span>}
           </Button>
 
           <Button variant="ghost" className={`w-full justify-start mt-2 ${isCollapsed ? "px-2" : "px-3"}`}>
