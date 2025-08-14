@@ -11,7 +11,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useChatContext } from "./chat-context"
 import { getCustomerDisplayName, getUserInitials, formatMessageTime, formatLastUpdate } from "./chat-utils"
 import { useSearchParams } from "next/navigation"  // Add this import
-import { useSearchParams } from "next/navigation"  // Add this import
 
 // Remover datos mock - ahora usamos el contexto
 
