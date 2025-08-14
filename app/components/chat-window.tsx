@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useChatContext } from "./chat-context"
 import { getCustomerDisplayName, getUserInitials, formatMessageTime, formatLastUpdate } from "./chat-utils"
 import { useSearchParams } from "next/navigation"  // Add this import
+<<<<<<< HEAD
 
 // Remover datos mock - ahora usamos el contexto
 
@@ -28,6 +29,8 @@ const promotionTemplates = [
   "🎁 Oferta de temporada: Consulta + exámenes básicos con 25% de descuento. ¡No te lo pierdas!",
   "⚡ Flash sale: 30% off en tratamientos estéticos este fin de semana únicamente.",
 ]
+=======
+>>>>>>> be1dd7a (feat: implement manual message sending functionality)
 
 interface ChatWindowProps {
   conversationId: string
@@ -65,6 +68,9 @@ export function ChatWindow({ conversationId }: ChatWindowProps) {
   const [hasNewMessages, setHasNewMessages] = useState(false)
   const [hasCompletedInitialScroll, setHasCompletedInitialScroll] = useState(false)
   
+  const searchParams = useSearchParams()
+  const clinicId = searchParams.get('clinic_id')
+
   // Memoizar los datos específicos de esta conversación para evitar re-renderizados
   const chatMessages = useMemo(() => {
     const msgs = messages[conversationId] || []
@@ -360,6 +366,7 @@ export function ChatWindow({ conversationId }: ChatWindowProps) {
     }
   }, [chatMessages.length, isInitialLoad, isLoading])
 
+<<<<<<< HEAD
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
   }, [chatMessages])
@@ -372,6 +379,18 @@ export function ChatWindow({ conversationId }: ChatWindowProps) {
       console.error("No se encontró el número de WhatsApp del cliente")
       return
     }
+=======
+  const handleSendMessage = async () => {
+    if (!message.trim()) return
+
+    // Validar datos necesarios
+    if (!customer?.whatsapp_number) {
+      console.error("No se encontró el número de WhatsApp del cliente")
+      return
+    }
+    
+
+>>>>>>> be1dd7a (feat: implement manual message sending functionality)
     if (!clinicId) {
       console.error("No se encontró el ID de la clínica")
       return
@@ -381,7 +400,11 @@ export function ChatWindow({ conversationId }: ChatWindowProps) {
     const currentUserId = "51eae6e6-b29f-981e-cd02-d50bc8147fac"
 
     try {
+<<<<<<< HEAD
       // Usar phoneNumberId proporcionado 
+=======
+      // Usar phoneNumberId proporcionado por el backend developer
+>>>>>>> be1dd7a (feat: implement manual message sending functionality)
       // Este es el phoneNumberId confirmado para la clínica en producción
       const phoneNumberId = 613102665225070
 
@@ -413,15 +436,25 @@ export function ChatWindow({ conversationId }: ChatWindowProps) {
       
       // Limpiar el input
       setMessage("")
+<<<<<<< HEAD
+=======
+      
+      // TODO: Actualizar la lista de mensajes con el mensaje enviado
+      // Esto podría hacerse agregando el mensaje al contexto local
+      // o recargando los mensajes desde el servidor
+>>>>>>> be1dd7a (feat: implement manual message sending functionality)
 
       // Scroll al final después de enviar mensaje
       requestAnimationFrame(() => {
         setTimeout(scrollToBottom, 50)
       })
+<<<<<<< HEAD
       
       // TODO: Actualizar la lista de mensajes con el mensaje enviado
       // Esto podría hacerse agregando el mensaje al contexto local
       // o recargando los mensajes desde el servidor
+=======
+>>>>>>> be1dd7a (feat: implement manual message sending functionality)
 
     } catch (error) {
       console.error("Error al enviar mensaje:", error)
