@@ -4,7 +4,7 @@ import { useState, useMemo, useEffect, useRef, useCallback } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
-import { Send, Zap, Phone, Calendar, MapPin, FileText, CreditCard, Bot, User, LifeBuoy, ChevronLeft, ChevronRight, MessageSquare } from "lucide-react"
+import { Send, Zap, Phone, Calendar, MapPin, FileText, CreditCard, Bot, User, LifeBuoy, ChevronLeft, ChevronRight, MessageSquare, Loader2 } from "lucide-react"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSub, DropdownMenuSubContent, DropdownMenuSubTrigger } from "@/components/ui/dropdown-menu"
 import { Dialog, DialogContent } from "@/components/ui/dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -35,6 +35,7 @@ interface ChatWindowProps {
 
 export function ChatWindow({ conversationId }: ChatWindowProps) {
   const [message, setMessage] = useState("")
+  const [isSendingMessage, setIsSendingMessage] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
@@ -54,7 +55,9 @@ export function ChatWindow({ conversationId }: ChatWindowProps) {
     loadingOlderMessages,
     pagination,
     loadOlderMessages,
-    loadNewMessages
+    loadNewMessages,
+    addMessage,
+    cleanDuplicateMessages
   } = useChatContext()
   const messagesContainerRef = useRef<HTMLDivElement>(null)
   const [previousScrollHeight, setPreviousScrollHeight] = useState(0)
@@ -340,6 +343,30 @@ export function ChatWindow({ conversationId }: ChatWindowProps) {
     }
   }, [chatMessages.length, conversationId, isLoading, isInitialLoad, hasScrolledToBottom, isLoadingMore, scrollToBottom])
 
+  // Limpiar duplicados periódicamente para mantener la integridad de los datos
+  useEffect(() => {
+    if (!conversationId || !customer) return
+
+    console.log('🧹 Configurando limpieza periódica de duplicados para', conversationId)
+    
+    // Limpiar duplicados cada 2 minutos
+    const cleanInterval = setInterval(() => {
+      console.log('🧹 Ejecutando limpieza periódica de duplicados')
+      cleanDuplicateMessages(conversationId)
+    }, 2 * 60 * 1000) // 2 minutos
+
+    // También limpiar una vez después de 30 segundos de cargar la conversación
+    const initialClean = setTimeout(() => {
+      console.log('🧹 Limpieza inicial de duplicados')
+      cleanDuplicateMessages(conversationId)
+    }, 30000) // 30 segundos
+
+    return () => {
+      clearInterval(cleanInterval)
+      clearTimeout(initialClean)
+    }
+  }, [conversationId, customer, cleanDuplicateMessages])
+
   // Asegurar scroll al final durante la carga inicial cuando cambian los mensajes
   useEffect(() => {
     if (isInitialLoad && chatMessages.length > 0 && !isLoading) {
@@ -365,20 +392,30 @@ export function ChatWindow({ conversationId }: ChatWindowProps) {
   }, [chatMessages])
 
   const handleSendMessage = async () => {
-    if (!message.trim()) return
+    if (!message.trim() || isSendingMessage) return
+    
+    setIsSendingMessage(true)
     // Validar datos necesarios
     if (!customer?.whatsapp_number) {
-
       console.error("No se encontró el número de WhatsApp del cliente")
+      setIsSendingMessage(false)
       return
     }
     if (!clinicId) {
       console.error("No se encontró el ID de la clínica")
+      setIsSendingMessage(false)
       return
     }
 
-    // Usando userId hardcodeado ya que el proyecto no cuenta con autenticación
-    const currentUserId = "51eae6e6-b29f-981e-cd02-d50bc8147fac"
+    // Obtener el customer ID del chat seleccionado
+    const currentUserId = customer?.id
+
+    if (!currentUserId) {
+      console.error("No se encontró el ID del customer")
+      alert("Error: No se pudo identificar el usuario del chat")
+      setIsSendingMessage(false)
+      return
+    }
 
     try {
       // Usar phoneNumberId proporcionado 
@@ -411,6 +448,30 @@ export function ChatWindow({ conversationId }: ChatWindowProps) {
       const result = await response.json()
       console.log("Mensaje enviado exitosamente:", result)
 
+      // Crear el mensaje para agregar al chat UI inmediatamente
+      const sentMessage = {
+        id: `manual_${Date.now()}_${Math.random().toString(36).substring(2, 15)}`,
+        chat_id: conversationId,
+        clinic_id: clinicId,
+        customer_id: currentUserId,
+        content: message.trim(),
+        sender: 'clinic', // Importante: identificar como mensaje de la clínica
+        timestamp: new Date(),
+        created_at: new Date().toISOString()
+      }
+
+      // Agregar el mensaje enviado al contexto inmediatamente
+      addMessage(currentUserId, sentMessage)
+
+      // NO verificar mensajes nuevos inmediatamente después de enviar
+      // para evitar duplicación. El polling automático lo hará después.
+      // Pero podemos hacer una verificación única después de 5 segundos para
+      // reemplazar el mensaje temporal con el real del servidor
+      setTimeout(() => {
+        console.log('🔄 Verificación única para reemplazar mensaje temporal con real')
+        loadNewMessages(clinicId, currentUserId)
+      }, 5000)
+
       // Limpiar el input
       setMessage("")
 
@@ -418,14 +479,11 @@ export function ChatWindow({ conversationId }: ChatWindowProps) {
         setTimeout(scrollToBottom, 50)
       })
 
-      // TODO: Actualizar la lista de mensajes con el mensaje enviado
-      // Esto podría hacerse agregando el mensaje al contexto local
-      // o recargando los mensajes desde el servidor
-
     } catch (error) {
       console.error("Error al enviar mensaje:", error)
-      // TODO: Mostrar notificación de error al usuario
       alert(`Error al enviar mensaje: ${error instanceof Error ? error.message : 'Error desconocido'}`)
+    } finally {
+      setIsSendingMessage(false)
     }
   }
 
@@ -583,7 +641,7 @@ export function ChatWindow({ conversationId }: ChatWindowProps) {
 
                 {/* Determinar si es mensaje del usuario (izquierda) o de la API (derecha) */}
                 {(() => {
-                  const isUserMessage = msg.sender === "user"
+                  const isUserMessage = msg.sender === "user" || msg.sender === "patient"
 
                   return (
                     <div className={`flex ${isUserMessage ? "justify-start" : "justify-end"}`}>
@@ -688,15 +746,24 @@ export function ChatWindow({ conversationId }: ChatWindowProps) {
           </DropdownMenu>
 
           <Input
-            placeholder="Escribe un mensaje..."
+            placeholder={isSendingMessage ? "Enviando mensaje..." : "Escribe un mensaje..."}
             value={message}
             onChange={(e) => setMessage(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && handleSendMessage()}
+            onKeyDown={(e) => e.key === "Enter" && !isSendingMessage && handleSendMessage()}
+            disabled={isSendingMessage}
             className="flex-1"
           />
 
-          <Button onClick={handleSendMessage} size="sm">
-            <Send className="h-4 w-4" />
+          <Button 
+            onClick={handleSendMessage} 
+            size="sm" 
+            disabled={isSendingMessage || !message.trim()}
+          >
+            {isSendingMessage ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Send className="h-4 w-4" />
+            )}
           </Button>
         </div>
       </div>
