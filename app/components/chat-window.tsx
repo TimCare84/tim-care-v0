@@ -44,14 +44,17 @@ export function ChatWindow({ conversationId }: ChatWindowProps) {
   const [currentRescueTemplateIndex, setCurrentRescueTemplateIndex] = useState(0)
   const [currentPromotionTemplateIndex, setCurrentPromotionTemplateIndex] = useState(0)
 
-  const { 
-    messages, 
-    customers, 
-    loadingConversations, 
-    loadingOlderMessages, 
-    pagination, 
+  const searchParams = useSearchParams()
+  const clinicId = searchParams.get('clinic_id')
+
+  const {
+    messages,
+    customers,
+    loadingConversations,
+    loadingOlderMessages,
+    pagination,
     loadOlderMessages,
-    loadNewMessages 
+    loadNewMessages
   } = useChatContext()
   const messagesContainerRef = useRef<HTMLDivElement>(null)
   const [previousScrollHeight, setPreviousScrollHeight] = useState(0)
@@ -61,15 +64,12 @@ export function ChatWindow({ conversationId }: ChatWindowProps) {
   const [lastKnownMessageCount, setLastKnownMessageCount] = useState(0)
   const [hasNewMessages, setHasNewMessages] = useState(false)
   const [hasCompletedInitialScroll, setHasCompletedInitialScroll] = useState(false)
-  
-  const searchParams = useSearchParams()
-  const clinicId = searchParams.get('clinic_id')
 
   // Memoizar los datos específicos de esta conversación para evitar re-renderizados
   const chatMessages = useMemo(() => {
     const msgs = messages[conversationId] || []
     console.log('💬 Mensajes en ChatWindow para', conversationId, ':', msgs.length)
-    
+
     // Los mensajes del API vienen del más reciente al más viejo
     // Para mostrarlos correctamente en la UI (más antiguos arriba, más recientes abajo)
     // Necesitamos ordenarlos por timestamp de forma ascendente
@@ -78,15 +78,15 @@ export function ChatWindow({ conversationId }: ChatWindowProps) {
       const timeB = b.timestamp ? new Date(b.timestamp).getTime() : 0
       return timeA - timeB // Orden ascendente: más antiguos primero
     })
-    
+
     if (msgs.length > 0) {
       console.log('📝 Primer mensaje (más antiguo):', sortedMessages[0]?.content?.substring(0, 30))
       console.log('📝 Último mensaje (más reciente):', sortedMessages[sortedMessages.length - 1]?.content?.substring(0, 30))
     }
-    
+
     return sortedMessages
   }, [messages, conversationId])
-  
+
   const customer = useMemo(() => customers[conversationId], [customers, conversationId])
   const isLoading = useMemo(() => loadingConversations[conversationId] || false, [loadingConversations, conversationId])
   const isLoadingOlderMsgs = useMemo(() => loadingOlderMessages[conversationId] || false, [loadingOlderMessages, conversationId])
@@ -98,7 +98,7 @@ export function ChatWindow({ conversationId }: ChatWindowProps) {
       const container = messagesContainerRef.current
       // Usar scrollTop directamente para asegurar que funcione
       container.scrollTop = container.scrollHeight
-      
+
       // Verificar que realmente llegamos al final
       const isAtBottom = container.scrollTop + container.clientHeight >= container.scrollHeight - 10
       console.log('📍 ScrollToBottom ejecutado:', {
@@ -107,7 +107,7 @@ export function ChatWindow({ conversationId }: ChatWindowProps) {
         clientHeight: container.clientHeight,
         isAtBottom
       })
-      
+
       // Si no llegamos al final, intentar de nuevo
       if (!isAtBottom) {
         setTimeout(() => {
@@ -125,7 +125,7 @@ export function ChatWindow({ conversationId }: ChatWindowProps) {
   const isNearBottom = useCallback(() => {
     const container = messagesContainerRef.current
     if (!container) return false
-    
+
     const { scrollTop, scrollHeight, clientHeight } = container
     const threshold = 100 // Pixels desde el bottom para considerar "cerca del final"
     return scrollTop + clientHeight >= scrollHeight - threshold
@@ -138,7 +138,7 @@ export function ChatWindow({ conversationId }: ChatWindowProps) {
 
     const { scrollTop, scrollHeight, clientHeight } = container
     const threshold = 150 // Pixels desde el top para activar la carga
-    
+
     // Detectar si el usuario está cerca del final
     const nearBottom = scrollTop + clientHeight >= scrollHeight - 100
     setHasScrolledToBottom(nearBottom)
@@ -161,14 +161,14 @@ export function ChatWindow({ conversationId }: ChatWindowProps) {
 
     // Cargar mensajes antiguos SOLO si el usuario hace scroll hacia arriba manualmente
     // NO cargar automáticamente al inicio
-    if (scrollTop <= threshold && 
-        !isLoadingOlderMsgs && 
-        !isLoadingMore &&
-        currentPagination?.hasMore &&
-        chatMessages.length > 0 && 
-        hasCompletedInitialScroll && // Solo cargar después de completar el scroll inicial
-        scrollTop > 10) { // Solo cargar si el usuario ha hecho scroll significativo (más de 10px)
-        
+    if (scrollTop <= threshold &&
+      !isLoadingOlderMsgs &&
+      !isLoadingMore &&
+      currentPagination?.hasMore &&
+      chatMessages.length > 0 &&
+      hasCompletedInitialScroll && // Solo cargar después de completar el scroll inicial
+      scrollTop > 10) { // Solo cargar si el usuario ha hecho scroll significativo (más de 10px)
+
       console.log('📥 Iniciando carga de mensajes antiguos...')
       console.log('📥 Estado antes de cargar:', {
         mensajesActuales: chatMessages.length,
@@ -176,11 +176,11 @@ export function ChatWindow({ conversationId }: ChatWindowProps) {
         hayMas: currentPagination.hasMore,
         scrollTop
       })
-      
+
       // Guardar la altura actual para mantener posición después de cargar
       setPreviousScrollHeight(scrollHeight)
       setIsLoadingMore(true)
-      
+
       // Extraer clinicId del customer
       const clinicId = customer?.clinic_id || "default_clinic"
       loadOlderMessages(clinicId, conversationId)
@@ -213,14 +213,14 @@ export function ChatWindow({ conversationId }: ChatWindowProps) {
     if (container && previousScrollHeight > 0 && !isLoadingOlderMsgs && isLoadingMore) {
       const newScrollHeight = container.scrollHeight
       const scrollDiff = newScrollHeight - previousScrollHeight
-      
+
       console.log('📍 Ajustando posición de scroll:', {
         previousHeight: previousScrollHeight,
         newHeight: newScrollHeight,
         scrollDiff,
         currentScrollTop: container.scrollTop
       })
-      
+
       // Ajustar la posición de scroll para mantener la vista
       container.scrollTop = scrollDiff
       setPreviousScrollHeight(0)
@@ -231,10 +231,10 @@ export function ChatWindow({ conversationId }: ChatWindowProps) {
   // Detectar mensajes nuevos para mostrar indicador
   useEffect(() => {
     // Solo mostrar indicador si no es la carga inicial y hay mensajes nuevos
-    if (chatMessages.length > lastKnownMessageCount && 
-        lastKnownMessageCount > 0 && 
-        !hasScrolledToBottom && 
-        !isInitialLoad) {
+    if (chatMessages.length > lastKnownMessageCount &&
+      lastKnownMessageCount > 0 &&
+      !hasScrolledToBottom &&
+      !isInitialLoad) {
       setHasNewMessages(true)
       console.log('📨 Detectados mensajes nuevos, mostrando indicador')
     }
@@ -266,10 +266,10 @@ export function ChatWindow({ conversationId }: ChatWindowProps) {
     if (!conversationId || !customer?.clinic_id) return
 
     console.log('🕒 Iniciando polling cada 3 minutos para', conversationId)
-    
+
     const POLLING_INTERVAL = 1 * 60 * 1000 // 3 minutos en milisegundos
     const clinicId = customer.clinic_id
-    
+
     // Configurar intervalo de polling
     const pollInterval = setInterval(() => {
       console.log('⏰ Polling automático - Verificando mensajes nuevos')
@@ -296,7 +296,7 @@ export function ChatWindow({ conversationId }: ChatWindowProps) {
       if (isInitialLoad) {
         // En la carga inicial, siempre hacer scroll al final
         console.log('🎯 Auto-scroll al final (carga inicial)')
-        
+
         // Usar múltiples timeouts para asegurar que el contenido esté renderizado
         const initialTimer = setTimeout(() => {
           if (messagesContainerRef.current) {
@@ -304,18 +304,18 @@ export function ChatWindow({ conversationId }: ChatWindowProps) {
             // Primer intento de scroll
             container.scrollTop = container.scrollHeight
             console.log('📍 Primer intento de scroll:', container.scrollTop, container.scrollHeight)
-            
+
             // Segundo intento después de un breve delay para asegurar renderizado completo
             const finalTimer = setTimeout(() => {
               if (messagesContainerRef.current) {
                 const finalContainer = messagesContainerRef.current
                 finalContainer.scrollTop = finalContainer.scrollHeight
                 console.log('📍 Scroll final completado:', finalContainer.scrollTop, finalContainer.scrollHeight)
-                
+
                 // Verificar que realmente llegamos al final
                 const isAtBottom = finalContainer.scrollTop + finalContainer.clientHeight >= finalContainer.scrollHeight - 10
                 console.log('✅ Verificación de scroll al final:', isAtBottom)
-                
+
                 setIsInitialLoad(false)
                 // Marcar que el scroll inicial se ha completado
                 setHasCompletedInitialScroll(true)
@@ -324,11 +324,11 @@ export function ChatWindow({ conversationId }: ChatWindowProps) {
                 setLastKnownMessageCount(chatMessages.length)
               }
             }, 100)
-            
+
             return () => clearTimeout(finalTimer)
           }
         }, 300)
-        
+
         return () => clearTimeout(initialTimer)
       } else if (hasScrolledToBottom && !isLoadingMore) {
         // Solo hacer auto-scroll si el usuario estaba cerca del final
@@ -355,7 +355,7 @@ export function ChatWindow({ conversationId }: ChatWindowProps) {
           })
         }
       }, 500)
-      
+
       return () => clearTimeout(timer)
     }
   }, [chatMessages.length, isInitialLoad, isLoading])
@@ -368,7 +368,7 @@ export function ChatWindow({ conversationId }: ChatWindowProps) {
     if (!message.trim()) return
     // Validar datos necesarios
     if (!customer?.whatsapp_number) {
-      
+
       console.error("No se encontró el número de WhatsApp del cliente")
       return
     }
@@ -410,15 +410,14 @@ export function ChatWindow({ conversationId }: ChatWindowProps) {
 
       const result = await response.json()
       console.log("Mensaje enviado exitosamente:", result)
-      
+
       // Limpiar el input
       setMessage("")
 
-      // Scroll al final después de enviar mensaje
       requestAnimationFrame(() => {
         setTimeout(scrollToBottom, 50)
       })
-      
+
       // TODO: Actualizar la lista de mensajes con el mensaje enviado
       // Esto podría hacerse agregando el mensaje al contexto local
       // o recargando los mensajes desde el servidor
@@ -595,8 +594,8 @@ export function ChatWindow({ conversationId }: ChatWindowProps) {
                         <Avatar className="h-8 w-8">
                           <AvatarFallback
                             className={`text-white font-medium ${isUserMessage
-                                ? "bg-gradient-to-br from-gray-400 to-gray-600"
-                                : "bg-gradient-to-br from-blue-400 to-blue-600"
+                              ? "bg-gradient-to-br from-gray-400 to-gray-600"
+                              : "bg-gradient-to-br from-blue-400 to-blue-600"
                               }`}
                           >
                             {isUserMessage ? (
@@ -609,8 +608,8 @@ export function ChatWindow({ conversationId }: ChatWindowProps) {
 
                         <div
                           className={`rounded-lg p-3 ${isUserMessage
-                              ? "bg-gray-100 text-gray-900"
-                              : "bg-blue-500 text-white"
+                            ? "bg-gray-100 text-gray-900"
+                            : "bg-blue-500 text-white"
                             }`}
                         >
                           <p className="text-sm">{msg.content || 'Mensaje sin contenido'}</p>
@@ -636,9 +635,9 @@ export function ChatWindow({ conversationId }: ChatWindowProps) {
               <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
               <span className="text-sm text-blue-700">Hay mensajes nuevos</span>
             </div>
-            <Button 
-              variant="outline" 
-              size="sm" 
+            <Button
+              variant="outline"
+              size="sm"
               onClick={scrollToBottom}
               className="text-blue-600 hover:text-blue-800 border-blue-300 hover:border-blue-400"
             >
@@ -675,8 +674,8 @@ export function ChatWindow({ conversationId }: ChatWindowProps) {
                     </DropdownMenuSubContent>
                   </DropdownMenuSub>
                 ) : (
-                  <DropdownMenuItem 
-                    key={index} 
+                  <DropdownMenuItem
+                    key={index}
                     onClick={action.action}
                     className={action.special ? "bg-orange-50 text-orange-700 hover:bg-orange-100" : ""}
                   >
