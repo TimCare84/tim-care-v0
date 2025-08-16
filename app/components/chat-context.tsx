@@ -30,6 +30,8 @@ interface ChatContextType {
   loadUserMessages: (clinicId: string, userId: string, page?: number) => Promise<void>
   loadOlderMessages: (clinicId: string, userId: string) => Promise<void>
   loadNewMessages: (clinicId: string, userId: string) => Promise<void> // Nueva función para mensajes recientes
+  addMessage: (userId: string, message: Message) => void // Función para agregar mensaje al contexto
+  cleanDuplicateMessages: (userId: string) => void // Función para limpiar duplicados
   setSelectedConversation: (id: string) => void
 }
 
@@ -81,7 +83,7 @@ export function ChatProvider({ children }: ChatProviderProps) {
         clinic_id: clinicId,
         customer_id: userId,
         content: msg.content || msg.message || '',
-        sender: msg.sender || 'user',
+        sender: msg.sender || 'patient',
         timestamp: msg.timestamp || msg.created_at,
         created_at: msg.created_at || new Date().toISOString(),
         updated_at: msg.updated_at || new Date().toISOString()
@@ -274,7 +276,7 @@ export function ChatProvider({ children }: ChatProviderProps) {
         clinic_id: clinicId,
         customer_id: userId,
         content: msg.content || msg.message || '',
-        sender: msg.sender || 'user',
+        sender: msg.sender || 'patient',
         timestamp: msg.timestamp || msg.created_at,
         created_at: msg.created_at || new Date().toISOString(),
         updated_at: msg.updated_at || new Date().toISOString()
@@ -353,7 +355,7 @@ export function ChatProvider({ children }: ChatProviderProps) {
         clinic_id: clinicId,
         customer_id: userId,
         content: msg.content || msg.message || '',
-        sender: msg.sender || 'user',
+        sender: msg.sender || 'patient',
         timestamp: msg.timestamp || msg.created_at,
         created_at: msg.created_at || new Date().toISOString(),
         updated_at: msg.updated_at || new Date().toISOString()
@@ -367,9 +369,51 @@ export function ChatProvider({ children }: ChatProviderProps) {
       }
       
       // Filtrar solo mensajes que no existen ya (nuevos)
-      const newMessages = formattedMessages.filter(newMsg => 
-        !existingMessages.some(existingMsg => existingMsg.id === newMsg.id)
-      )
+      // Mejorar la lógica de detección de duplicados para mensajes manuales
+      const newMessages = formattedMessages.filter(newMsg => {
+        return !existingMessages.some(existingMsg => {
+          // Si tienen el mismo ID, es el mismo mensaje
+          if (existingMsg.id === newMsg.id) return true
+          
+          // Si el mensaje existente es manual (tiene ID temporal), verificar por contenido y tiempo
+          if (existingMsg.id.startsWith('manual_')) {
+            const existingTime = new Date(existingMsg.timestamp || existingMsg.created_at || 0).getTime()
+            const newTime = new Date(newMsg.timestamp || newMsg.created_at || 0).getTime()
+            const timeDiff = Math.abs(existingTime - newTime)
+            
+            // Si tienen el mismo contenido, mismo sender y el tiempo es muy cercano (dentro de 2 minutos), es duplicado
+            if (existingMsg.content === newMsg.content && 
+                existingMsg.sender === newMsg.sender && 
+                timeDiff < 120000) { // 2 minutos
+              console.log('🚫 Mensaje manual duplicado detectado por contenido, sender y tiempo:', {
+                contenido: newMsg.content?.substring(0, 50),
+                sender: newMsg.sender,
+                tiempoDiferencia: Math.round(timeDiff / 1000) + 's'
+              })
+              return true
+            }
+          }
+          
+          // Para mensajes no manuales, usar la lógica original pero más estricta
+          const existingTime = new Date(existingMsg.timestamp || existingMsg.created_at || 0).getTime()
+          const newTime = new Date(newMsg.timestamp || newMsg.created_at || 0).getTime()
+          const timeDiff = Math.abs(existingTime - newTime)
+          
+          // Solo considerar duplicado si tienen el mismo contenido, sender y tiempo muy cercano
+          if (existingMsg.content === newMsg.content && 
+              existingMsg.sender === newMsg.sender && 
+              timeDiff < 30000) { // 30 segundos
+            console.log('🚫 Mensaje duplicado detectado por contenido, sender y tiempo:', {
+              contenido: newMsg.content?.substring(0, 50),
+              sender: newMsg.sender,
+              tiempoDiferencia: Math.round(timeDiff / 1000) + 's'
+            })
+            return true
+          }
+          
+          return false
+        })
+      })
       
       console.log('🔍 Polling result:', {
         mensajesDelApi: formattedMessages.length,
@@ -416,6 +460,107 @@ export function ChatProvider({ children }: ChatProviderProps) {
     }
   }, [messages])
 
+  // Función para limpiar mensajes duplicados del contexto
+  const cleanDuplicateMessages = useCallback((userId: string) => {
+    setMessages(prev => {
+      const existingMessages = prev[userId] || []
+      if (existingMessages.length === 0) return prev
+      
+      // Agrupar mensajes por contenido y tiempo para detectar duplicados
+      const messageGroups = new Map<string, Message[]>()
+      
+      existingMessages.forEach(msg => {
+        const key = `${msg.content}_${msg.sender}`
+        if (!messageGroups.has(key)) {
+          messageGroups.set(key, [])
+        }
+        messageGroups.get(key)!.push(msg)
+      })
+      
+      // Para cada grupo, mantener solo el mensaje más reciente o el que tenga ID real
+      const cleanedMessages: Message[] = []
+      
+      messageGroups.forEach((group, key) => {
+        if (group.length === 1) {
+          // Solo un mensaje, agregarlo
+          cleanedMessages.push(group[0])
+        } else {
+          // Múltiples mensajes, encontrar el mejor candidato
+          const sortedGroup = group.sort((a, b) => {
+            // Priorizar mensajes con ID real del servidor
+            const aIsReal = !a.id.startsWith('manual_')
+            const bIsReal = !b.id.startsWith('manual_')
+            
+            if (aIsReal && !bIsReal) return -1
+            if (!aIsReal && bIsReal) return 1
+            
+            // Si ambos son reales o ambos son temporales, usar timestamp
+            const aTime = new Date(a.timestamp || a.created_at || 0).getTime()
+            const bTime = new Date(b.timestamp || b.created_at || 0).getTime()
+            return bTime - aTime // Más reciente primero
+          })
+          
+          // Agregar solo el primer mensaje (el mejor candidato)
+          cleanedMessages.push(sortedGroup[0])
+          
+          if (group.length > 1) {
+            console.log('🧹 Limpiando duplicados para:', key.substring(0, 50), 'manteniendo:', sortedGroup[0].id)
+          }
+        }
+      })
+      
+      // Ordenar por timestamp
+      const sortedCleanedMessages = cleanedMessages.sort((a, b) => {
+        const timeA = new Date(a.timestamp || a.created_at || 0).getTime()
+        const timeB = new Date(b.timestamp || b.created_at || 0).getTime()
+        return timeA - timeB
+      })
+      
+      return {
+        ...prev,
+        [userId]: sortedCleanedMessages
+      }
+    })
+  }, [])
+
+  // Función para agregar un mensaje manualmente al contexto
+  const addMessage = useCallback((userId: string, message: Message) => {
+    setMessages(prev => {
+      const existingMessages = prev[userId] || []
+      
+      // Verificar si ya existe un mensaje manual con el mismo contenido y tiempo cercano
+      const existingManualIndex = existingMessages.findIndex(existingMsg => {
+        if (existingMsg.id.startsWith('manual_')) {
+          const existingTime = new Date(existingMsg.timestamp || existingMsg.created_at || 0).getTime()
+          const newTime = new Date(message.timestamp || message.created_at || 0).getTime()
+          const timeDiff = Math.abs(existingTime - newTime)
+          
+          // Si tienen el mismo contenido y tiempo cercano (dentro de 2 minutos), es el mismo mensaje
+          return existingMsg.content === message.content && timeDiff < 120000
+        }
+        return false
+      })
+      
+      let updatedMessages: Message[]
+      
+      if (existingManualIndex !== -1) {
+        // Reemplazar el mensaje manual existente con el nuevo (que tiene ID real del servidor)
+        console.log('🔄 Reemplazando mensaje manual temporal con mensaje real del servidor:', message.content?.substring(0, 50))
+        updatedMessages = [...existingMessages]
+        updatedMessages[existingManualIndex] = message
+      } else {
+        // Agregar como nuevo mensaje
+        console.log('➕ Mensaje agregado manualmente al contexto:', message.content?.substring(0, 50))
+        updatedMessages = [...existingMessages, message]
+      }
+      
+      return {
+        ...prev,
+        [userId]: updatedMessages
+      }
+    })
+  }, [])
+
   // Función segura para establecer conversación seleccionada
   const safeSetSelectedConversation = useCallback((id: string) => {
     const safeId = id || ""
@@ -436,8 +581,10 @@ export function ChatProvider({ children }: ChatProviderProps) {
     loadUserMessages,
     loadOlderMessages,
     loadNewMessages,
+    addMessage,
+    cleanDuplicateMessages,
     setSelectedConversation: safeSetSelectedConversation
-  }), [chats, messages, customers, selectedConversation, loading, loadingConversations, loadingOlderMessages, pagination, error, loadMessagesForChat, loadUserMessages, loadOlderMessages, loadNewMessages, safeSetSelectedConversation])
+  }), [chats, messages, customers, selectedConversation, loading, loadingConversations, loadingOlderMessages, pagination, error, loadMessagesForChat, loadUserMessages, loadOlderMessages, loadNewMessages, addMessage, cleanDuplicateMessages, safeSetSelectedConversation])
 
   return (
     <ChatContext.Provider value={value}>
