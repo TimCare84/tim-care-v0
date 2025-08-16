@@ -27,7 +27,7 @@ function MedicalCRMContent() {
       case "pacientes":
         return <ChatViewer />
       case "calendario":
-        return <CalendarView />
+        return <CalendarView clinicId={clinicId} />
       default:
         return <ChatViewer />
     }
