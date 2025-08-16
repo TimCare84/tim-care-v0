@@ -10,20 +10,97 @@ import {
 } from '@schedule-x/calendar'
 import { createEventsServicePlugin } from '@schedule-x/events-service'
 import { createEventModalPlugin } from '@schedule-x/event-modal'
-import { Stethoscope, Phone, Clock, User, Plus } from "lucide-react"
+import { Stethoscope, Phone, Clock, User, Plus, AlertCircle, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { useAppointmentsN8N, type AppointmentN8N } from "@/hooks/useAppointmentsN8N"
+import { Alert, AlertDescription } from "@/components/ui/alert"
  
 import '@schedule-x/theme-default/dist/index.css'
  
-export function CalendarView() {
+interface CalendarViewProps {
+  clinicId: string | null
+}
+
+export function CalendarView({ clinicId }: CalendarViewProps) {
   // PERFORMANCE OPTIMIZATION: Memoize Schedule-X plugins to prevent recreation on every render
   // This prevents the calendar from refreshing when form inputs change
   const eventsService = useMemo(() => createEventsServicePlugin(), [])
   const eventModal = useMemo(() => createEventModalPlugin(), [])
+  
+  // N8N Appointments Integration
+  const { appointments, loading, error, refetch } = useAppointmentsN8N(clinicId)
+  
+  // Function to extract patient info from note field
+  const extractPatientInfo = useCallback((note: string) => {
+    const lines = note.split('\n')
+    let patientName = 'Paciente Desconocido'
+    let consultationReason = 'Consulta'
+    
+    for (const line of lines) {
+      if (line.startsWith('Paciente:')) {
+        patientName = line.replace('Paciente:', '').trim()
+      } else if (line.startsWith('Motivo de la consulta:')) {
+        consultationReason = line.replace('Motivo de la consulta:', '').trim()
+      }
+    }
+    
+    return { patientName, consultationReason }
+  }, [])
+  
+  // Transform N8N appointments to Schedule-X format
+  const transformedEvents = useMemo(() => {
+    if (!appointments || appointments.length === 0) return []
+    
+    return appointments.map((appointment: AppointmentN8N) => {
+      const { patientName, consultationReason } = extractPatientInfo(appointment.note)
+      
+      // Get status color based on appointment status
+      const getStatusColor = (status: string) => {
+        switch (status) {
+          case 'scheduled': return '#22c55e' // green
+          case 'completed': return '#3b82f6' // blue
+          case 'cancelled': return '#ef4444' // red
+          case 'rescheduled': return '#f59e0b' // amber
+          default: return '#6b7280' // gray
+        }
+      }
+      
+      // Calculate end time: use end_time if available, otherwise add 20 minutes to start_time
+      const startTime = new Date(appointment.start_time)
+      const endTime = appointment.end_time 
+        ? new Date(appointment.end_time)
+        : new Date(startTime.getTime() + 20 * 60 * 1000) // Add 20 minutes
+      
+      // Format dates for Schedule-X (YYYY-MM-DD HH:mm)
+      const formatDateTime = (date: Date) => {
+        return date.toISOString().replace('Z', '').replace('T', ' ').substring(0, 16)
+      }
+      
+      return {
+        id: appointment.id,
+        title: `${patientName} - ${consultationReason}`,
+        start: formatDateTime(startTime),
+        end: formatDateTime(endTime),
+        calendarId: 'appointments',
+        // Custom properties for the modal
+        patientName,
+        consultationReason: consultationReason + (appointment.reason ? ` ${appointment.reason}` : ''),
+        phoneNumber: 'No disponible', // This would need to come from patient data
+        appointmentTime: startTime.toLocaleTimeString('es-ES', { 
+          hour: '2-digit', 
+          minute: '2-digit' 
+        }),
+        status: appointment.status,
+        appointmentId: appointment.id,
+        note: appointment.note,
+        backgroundColor: getStatusColor(appointment.status)
+      }
+    })
+  }, [appointments, extractPatientInfo])
   
   // Add Event Form State
   const [isAddEventOpen, setIsAddEventOpen] = useState(false)
@@ -79,13 +156,32 @@ export function CalendarView() {
   // PERFORMANCE OPTIMIZATION: Memoized custom component for event modal content
   // Prevents component recreation on every render, maintaining modal performance
   const CustomEventModal = useMemo(() => ({ calendarEvent }: { calendarEvent: any }) => {
+    const getStatusBadge = (status: string) => {
+      const statusConfig = {
+        scheduled: { color: 'bg-green-100 text-green-800', label: 'Agendada' },
+        completed: { color: 'bg-blue-100 text-blue-800', label: 'Completada' },
+        cancelled: { color: 'bg-red-100 text-red-800', label: 'Cancelada' },
+        rescheduled: { color: 'bg-yellow-100 text-yellow-800', label: 'Reagendada' }
+      }
+      
+      const config = statusConfig[status as keyof typeof statusConfig] || statusConfig.scheduled
+      return (
+        <span className={`px-2 py-1 rounded-full text-xs font-medium ${config.color}`}>
+          {config.label}
+        </span>
+      )
+    }
+    
     return (
       <div className="p-6 space-y-4">
-        <div className="flex items-center space-x-3 mb-4">
-          <User className="h-6 w-6 text-blue-600" />
-          <h2 className="text-xl font-semibold text-gray-900">
-            {calendarEvent.patientName}
-          </h2>
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center space-x-3">
+            <User className="h-6 w-6 text-blue-600" />
+            <h2 className="text-xl font-semibold text-gray-900">
+              {calendarEvent.patientName}
+            </h2>
+          </div>
+          {calendarEvent.status && getStatusBadge(calendarEvent.status)}
         </div>
         
         <div className="grid grid-cols-1 gap-4">
@@ -109,14 +205,19 @@ export function CalendarView() {
             <Phone className="h-5 w-5 text-blue-600" />
             <div>
               <p className="text-sm font-medium text-gray-700">Teléfono</p>
-              <a 
-                href={`tel:${calendarEvent.phoneNumber}`}
-                className="text-blue-600 hover:text-blue-800 font-medium"
-              >
-                {calendarEvent.phoneNumber}
-              </a>
+              <p className="text-gray-600">{calendarEvent.phoneNumber}</p>
             </div>
           </div>
+          
+          {calendarEvent.note && (
+            <div className="flex items-start space-x-3">
+              <User className="h-5 w-5 text-blue-600 mt-0.5" />
+              <div>
+                <p className="text-sm font-medium text-gray-700">Notas</p>
+                <p className="text-gray-900 text-sm whitespace-pre-line">{calendarEvent.note}</p>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     )
@@ -128,43 +229,8 @@ export function CalendarView() {
     eventModal: CustomEventModal
   }), [CustomEventModal])
  
-  // PERFORMANCE OPTIMIZATION: Memoize initial events to prevent recreation
-  // Static events array that doesn't change, preventing unnecessary calendar re-renders
-  const initialEvents = useMemo(() => [
-    {
-      id: '1',
-      title: 'Ana García - Consulta General',
-      start: '2025-08-15 09:00',
-      end: '2025-08-15 10:00',
-      // Custom properties
-      patientName: 'Ana García',
-      consultationReason: 'Consulta General',
-      phoneNumber: '+57 300 123 4567',
-      appointmentTime: '09:00 AM'
-    },
-    {
-      id: '2',
-      title: 'Joaquín Mendoza - Gastroenterología',
-      start: '2025-08-15 09:00',
-      end: '2025-08-15 10:00',
-      // Custom properties
-      patientName: 'Joaquín Mendoza',
-      consultationReason: 'Gastroenterología',
-      phoneNumber: '+57 300 777 8899',
-      appointmentTime: '09:00 AM'
-    },
-    {
-      id: '3',
-      title: 'Joaquín Mendoza - Gastroenterología',
-      start: '2025-08-15 11:00',
-      end: '2025-08-15 12:00',
-      // Custom properties
-      patientName: 'Joaquín Mendoza',
-      consultationReason: 'Gastroenterología',
-      phoneNumber: '+57 336 777 8899',
-      appointmentTime: '11:00 AM'
-    },
-  ], [])
+  // Use transformed events from N8N API instead of static data
+  // Events are automatically updated when appointments change
 
   // PERFORMANCE OPTIMIZATION: Memoize calendar configuration to prevent recreation
   // Critical optimization that prevents Schedule-X from re-initializing on every render
@@ -172,19 +238,69 @@ export function CalendarView() {
     const views = [createViewDay(), createViewWeek(), createViewMonthGrid(), createViewMonthAgenda()]
     return {
       views: views as [typeof views[0], ...Array<typeof views[0]>],
-      events: initialEvents,
+      events: transformedEvents,
       plugins: [eventsService, eventModal]
     }
-  }, [initialEvents, eventsService, eventModal])
+  }, [transformedEvents, eventsService, eventModal])
 
   const calendar = useCalendarApp(calendarConfig)
  
   useEffect(() => {
-    // PERFORMANCE OPTIMIZATION: Load events only once on component mount
-    // Prevents unnecessary API calls when form state changes
-    eventsService.getAll()
-  }, [eventsService])
+    // Update calendar events when transformedEvents change
+    if (eventsService && transformedEvents) {
+      // Clear existing events and add new ones
+      const currentEvents = eventsService.getAll()
+      currentEvents.forEach(event => eventsService.remove(event.id))
+      transformedEvents.forEach(event => eventsService.add(event))
+    }
+  }, [eventsService, transformedEvents])
  
+  // Show loading state
+  if (loading) {
+    return (
+      <div className="w-full h-full flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="h-8 w-8 animate-spin text-blue-600 mx-auto mb-4" />
+          <p className="text-gray-600">Cargando citas...</p>
+        </div>
+      </div>
+    )
+  }
+  
+  // Show error state
+  if (error) {
+    return (
+      <div className="w-full p-6">
+        <Alert className="border-red-200 bg-red-50">
+          <AlertCircle className="h-4 w-4 text-red-600" />
+          <AlertDescription className="text-red-800">
+            Error al cargar las citas: {error}
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={refetch}
+              className="ml-4"
+            >
+              Reintentar
+            </Button>
+          </AlertDescription>
+        </Alert>
+      </div>
+    )
+  }
+  
+  // Show message when no clinic ID is provided
+  if (!clinicId) {
+    return (
+      <div className="w-full h-full flex items-center justify-center">
+        <div className="text-center">
+          <AlertCircle className="h-8 w-8 text-yellow-600 mx-auto mb-4" />
+          <p className="text-gray-600">Por favor seleccione una clínica para ver las citas</p>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="w-full relative">
       <ScheduleXCalendar 
