@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useMemo, useCallback } from "react"
+import React, { useState, useEffect, useMemo, useCallback, useRef } from "react"
 import { useCalendarApp, ScheduleXCalendar } from '@schedule-x/react'
 import {
   createViewDay,
@@ -10,19 +10,364 @@ import {
 } from '@schedule-x/calendar'
 import { createEventsServicePlugin } from '@schedule-x/events-service'
 import { createEventModalPlugin } from '@schedule-x/event-modal'
-import { Stethoscope, Phone, Clock, User, Plus, AlertCircle, Loader2 } from "lucide-react"
+import { Stethoscope, Phone, Clock, User, Plus, AlertCircle, Loader2, Pencil, Trash2, Save, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Textarea } from "@/components/ui/textarea"
 import { useAppointmentsN8N, type AppointmentN8N } from "@/hooks/useAppointmentsN8N"
 import { Alert, AlertDescription } from "@/components/ui/alert"
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog"
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
  
 import '@schedule-x/theme-default/dist/index.css'
  
 interface CalendarViewProps {
   clinicId: string | null
+}
+
+// Custom component for event modal content
+const CustomEventModal = ({ calendarEvent }: { calendarEvent: any }) => {
+  // State for edit mode functionality
+  const [isEditing, setIsEditing] = useState(false)
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false)
+  const [editableEvent, setEditableEvent] = useState({
+    patientName: calendarEvent.patientName,
+    consultationReason: calendarEvent.consultationReason,
+    phoneNumber: calendarEvent.phoneNumber,
+    appointmentTime: calendarEvent.appointmentTime,
+    status: calendarEvent.status,
+    note: calendarEvent.note || ''
+  })
+  
+  // Ref to the modal container for portal targeting
+  const modalRef = useRef<HTMLDivElement>(null)
+
+  // Reset editable event when calendar event changes
+  useEffect(() => {
+    setEditableEvent({
+      patientName: calendarEvent.patientName,
+      consultationReason: calendarEvent.consultationReason,
+      phoneNumber: calendarEvent.phoneNumber,
+      appointmentTime: calendarEvent.appointmentTime,
+      status: calendarEvent.status,
+      note: calendarEvent.note || ''
+    })
+  }, [calendarEvent])
+
+  // Handle edit mode toggle
+  const handleEditToggle = () => {
+    setIsEditing(!isEditing)
+    if (isEditing) {
+      // Reset changes when canceling edit
+      setEditableEvent({
+        patientName: calendarEvent.patientName,
+        consultationReason: calendarEvent.consultationReason,
+        phoneNumber: calendarEvent.phoneNumber,
+        appointmentTime: calendarEvent.appointmentTime,
+        status: calendarEvent.status,
+        note: calendarEvent.note || ''
+      })
+    }
+  }
+
+  // Handle save changes
+  const handleSaveChanges = () => {
+    // ========================================
+    // 🔧 BACKEND:
+    // Funcionalidad para actualizar los nuevos datos del evento en la DB correspondiente
+    // ========================================
+
+    setIsEditing(false)
+    
+    // Editing success message to user
+    alert('Evento actualizado correctamente') 
+  }
+
+  // Handle delete event
+  const handleDeleteEvent = () => {
+    // ========================================
+    // 🔧 BACKEND INTEGRATION REQUIRED:
+    // Funcionalidad para eliminar el evento de la DB correspondiente
+    // ========================================
+
+    console.log('Deleting event:', calendarEvent.appointmentId)
+    
+    // For now, just show confirmation and close dialog
+    // TODO: Replace with actual API call
+    setShowDeleteDialog(false)
+    
+    // Show success message to user
+    alert('Evento eliminado correctamente') // TODO: Replace with proper toast notification
+  }
+
+  const getStatusBadge = (status: string) => {
+    const statusConfig = {
+      scheduled: { color: 'bg-green-100 text-green-800', label: 'Agendada' },
+      completed: { color: 'bg-blue-100 text-blue-800', label: 'Completada' },
+      cancelled: { color: 'bg-red-100 text-red-800', label: 'Cancelada' },
+      rescheduled: { color: 'bg-yellow-100 text-yellow-800', label: 'Reagendada' }
+    }
+    
+    const config = statusConfig[status as keyof typeof statusConfig] || statusConfig.scheduled
+    return (
+      <span className={`px-2 py-1 rounded-full text-xs font-medium ${config.color}`}>
+        {config.label}
+      </span>
+    )
+  }
+  
+  return (
+    <TooltipProvider>
+      <div 
+        ref={modalRef}
+        className={isEditing ? 'p-6 space-y-4 rounded-lg transition-colors border-2 border-blue-500 bg-blue-50/30' : 'p-6 space-y-4 rounded-lg transition-colors'}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex flex-col space-y-2">
+            {/* ----- NOMBRE DEL PACIENTE ----- */}
+            <div className="flex items-center space-x-3">
+              <User className="h-6 w-6 text-blue-600" />
+              <h2 className="text-xl font-semibold text-gray-900">
+                {/* -- Modo Edición -- */}
+                {isEditing ? (
+                  <Input 
+                    value={editableEvent.patientName}
+                    onChange={(e) => setEditableEvent(prev => ({ ...prev, patientName: e.target.value }))}
+                    className="text-xl font-semibold bg-gray-50 border-2 border-gray-200 rounded-md px-3 py-2 focus:border-blue-500 focus:ring-0 focus:ring-offset-0 hover:border-gray-300 transition-colors"
+                  />
+                // -- Modo Vista -- 
+                ) : (
+                  calendarEvent.patientName
+                )}
+              </h2>
+            </div>
+            {/* ----- ESTADO DEL EVENTO ----- */}
+            <div className="ml-9">
+              {/* -- Modo Edición -- */}
+              {isEditing ? (
+                <div className="flex items-center space-x-2">
+                  <span className="text-base font-bold text-gray-800">Estado:</span>
+                  <select 
+                    value={editableEvent.status}
+                    onChange={(e) => setEditableEvent(prev => ({ ...prev, status: e.target.value }))}
+                    onClick={(e) => e.stopPropagation()}
+                    className="bg-gray-50 border-2 border-gray-200 rounded-md px-3 py-2 focus:border-blue-500 focus:ring-0 focus:ring-offset-0 hover:border-gray-300 transition-colors text-sm cursor-pointer min-w-[120px]"
+                  >
+                    <option value="scheduled">Agendada</option>
+                    <option value="completed">Completada</option>
+                    <option value="cancelled">Cancelada</option>
+                    <option value="rescheduled">Reagendada</option>
+                  </select>
+                </div>
+              // -- Modo Vista -- 
+              ) : (
+                calendarEvent.status && getStatusBadge(calendarEvent.status)
+              )}
+            </div>
+          </div>
+          
+          {/* ----- BOTONES DE ACCIÓN ----- */}
+          <div className="flex items-center gap-1">
+            {/* -- Modo Vista -- */}
+            {!isEditing ? (
+              <>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={handleEditToggle}
+                      className="h-8 w-8 rounded-full hover:bg-blue-50"
+                    >
+                      <Pencil className="h-4 w-4 text-blue-600" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Editar Evento</p>
+                  </TooltipContent>
+                </Tooltip>
+
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => setShowDeleteDialog(true)}
+                      className="h-8 w-8 rounded-full hover:bg-red-50"
+                    >
+                      <Trash2 className="h-4 w-4 text-red-600" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Eliminar Evento</p>
+                  </TooltipContent>
+                </Tooltip>
+              </>
+            // * -- Modo Edición -- *
+            ) : (
+              <>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      onClick={handleSaveChanges}
+                      className="h-8 w-8 rounded-full border-2 border-blue-600 bg-white hover:bg-blue-50"
+                    >
+                      <Save className="h-4 w-4 text-blue-600" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Guardar</p>
+                  </TooltipContent>
+                </Tooltip>
+
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={handleEditToggle}
+                      className="h-8 w-8 rounded-full hover:bg-gray-50"
+                    >
+                      <X className="h-4 w-4 text-gray-600" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Cancelar</p>
+                  </TooltipContent>
+                </Tooltip>
+              </>
+            )}
+          </div>
+        </div>
+      
+        <div className="grid grid-cols-1 gap-4">
+          {/* ----- TIPO DE CONSULTA ----- */}
+          <div className="flex items-center space-x-3">
+            <Stethoscope className="h-5 w-5 text-blue-600" />
+            <div className="flex-1">
+              {!isEditing && <p className="text-sm font-medium text-gray-700">Consulta</p>}
+              {/* -- Modo Edición -- */}
+              {isEditing ? (
+                <>
+                  <p className="text-base font-bold text-gray-800 mb-1">Consulta</p>
+                  <select 
+                  value={editableEvent.consultationReason}
+                  onChange={(e) => setEditableEvent(prev => ({ ...prev, consultationReason: e.target.value }))}
+                  onClick={(e) => e.stopPropagation()}
+                  className="bg-gray-50 border-2 border-gray-200 rounded-md px-3 py-2 focus:border-blue-500 focus:ring-0 focus:ring-offset-0 hover:border-gray-300 transition-colors w-full text-gray-900 cursor-pointer"
+                >
+                  <option value="Consulta General">Consulta General</option>
+                  <option value="Gastroenterología">Gastroenterología</option>
+                  <option value="Cardiología">Cardiología</option>
+                  <option value="Dermatología">Dermatología</option>
+                  <option value="Neurología">Neurología</option>
+                  <option value="Pediatría">Pediatría</option>
+                  <option value="Ginecología">Ginecología</option>
+                </select>
+                </>
+              // -- Modo Vista --
+              ) : (
+                <p className="text-gray-900">{calendarEvent.consultationReason}</p>
+              )}
+            </div>
+          </div>
+          
+          {/* ----- HORARIO DE LA CITA ----- */}
+          <div className="flex items-center space-x-3">
+            <Clock className="h-5 w-5 text-blue-600" />
+            <div className="flex-1">
+              {!isEditing && <p className="text-sm font-medium text-gray-700">Horario</p>}
+              {/* -- Modo Edición -- */}
+              {isEditing ? (
+                <>
+                  <p className="text-base font-bold text-gray-800 mb-1">Horario</p>
+                  <Input
+                  type="time"
+                  value={editableEvent.appointmentTime}
+                  onChange={(e) => setEditableEvent(prev => ({ ...prev, appointmentTime: e.target.value }))}
+                  className="bg-gray-50 border-2 border-gray-200 rounded-md px-3 py-2 focus:border-blue-500 focus:ring-0 focus:ring-offset-0 hover:border-gray-300 transition-colors w-full"
+                />
+                </>
+              // -- Modo Vista -- 
+              ) : (
+                <p className="text-gray-900">{calendarEvent.appointmentTime}</p>
+              )}
+            </div>
+          </div>
+          
+          {/* ----- TELÉFONO DEL PACIENTE ----- */}
+          <div className="flex items-center space-x-3">
+            <Phone className="h-5 w-5 text-blue-600" />
+            <div className="flex-1">
+              {!isEditing && <p className="text-sm font-medium text-gray-700">Teléfono</p>}
+              {/* -- Modo Edición -- */}
+              {isEditing ? (
+                <>
+                  <p className="text-base font-bold text-gray-800 mb-1">Teléfono</p>
+                  <Input
+                  value={editableEvent.phoneNumber}
+                  onChange={(e) => setEditableEvent(prev => ({ ...prev, phoneNumber: e.target.value }))}
+                  placeholder="Ej: +57 300 123 4567"
+                  className="bg-gray-50 border-2 border-gray-200 rounded-md px-3 py-2 focus:border-blue-500 focus:ring-0 focus:ring-offset-0 hover:border-gray-300 transition-colors w-full"
+                />
+                </>
+              ) : (
+                <p className="text-gray-600">{calendarEvent.phoneNumber}</p>
+              )}
+            </div>
+          </div>
+          
+          <div className="flex items-start space-x-3">
+            <User className="h-5 w-5 text-blue-600 mt-0.5" />
+            <div className="flex-1">
+              {!isEditing && <p className="text-sm font-medium text-gray-700">Notas</p>}
+              {isEditing ? (
+                <>
+                  <p className="text-base font-bold text-gray-800 mb-1">Notas</p>
+                  <Textarea
+                  value={editableEvent.note}
+                  onChange={(e) => setEditableEvent(prev => ({ ...prev, note: e.target.value }))}
+                  placeholder="Agregar notas sobre la cita..."
+                  className="bg-gray-50 border-2 border-gray-200 rounded-md px-3 py-2 min-h-[80px] resize-none focus:border-blue-500 focus:ring-0 focus:ring-offset-0 hover:border-gray-300 transition-colors w-full"
+                />
+                </>
+              ) : (
+                <p className="text-gray-900 text-sm whitespace-pre-line">
+                  {calendarEvent.note || 'Sin notas'}
+                </p>
+              )}
+            </div>
+          </div>
+        </div>
+
+        <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>¿Eliminar evento?</AlertDialogTitle>
+              <AlertDialogDescription>
+                Esta acción no se puede deshacer. El evento será eliminado permanentemente.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancelar</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={handleDeleteEvent}
+                className="bg-red-600 hover:bg-red-700"
+              >
+                Eliminar
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      </div>
+    </TooltipProvider>
+  )
 }
 
 export function CalendarView({ clinicId }: CalendarViewProps) {
@@ -114,6 +459,10 @@ export function CalendarView({ clinicId }: CalendarViewProps) {
 
   // Handle adding new event - memoized to prevent unnecessary re-renders
   const handleAddEvent = useCallback(() => {
+    // ========================================
+    // 🔧 BACKEND:
+    // Funcionalidad para agregar un nuevo evento a la DB correspondiente
+    // ========================================
     if (!newEvent.patientName || !newEvent.consultationReason || !newEvent.date || !newEvent.time) {
       alert('Por favor complete todos los campos requeridos')
       return
@@ -153,81 +502,11 @@ export function CalendarView({ clinicId }: CalendarViewProps) {
     setNewEvent(prev => ({ ...prev, [field]: value }))
   }, [])
 
-  // PERFORMANCE OPTIMIZATION: Memoized custom component for event modal content
-  // Prevents component recreation on every render, maintaining modal performance
-  const CustomEventModal = useMemo(() => ({ calendarEvent }: { calendarEvent: any }) => {
-    const getStatusBadge = (status: string) => {
-      const statusConfig = {
-        scheduled: { color: 'bg-green-100 text-green-800', label: 'Agendada' },
-        completed: { color: 'bg-blue-100 text-blue-800', label: 'Completada' },
-        cancelled: { color: 'bg-red-100 text-red-800', label: 'Cancelada' },
-        rescheduled: { color: 'bg-yellow-100 text-yellow-800', label: 'Reagendada' }
-      }
-      
-      const config = statusConfig[status as keyof typeof statusConfig] || statusConfig.scheduled
-      return (
-        <span className={`px-2 py-1 rounded-full text-xs font-medium ${config.color}`}>
-          {config.label}
-        </span>
-      )
-    }
-    
-    return (
-      <div className="p-6 space-y-4">
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center space-x-3">
-            <User className="h-6 w-6 text-blue-600" />
-            <h2 className="text-xl font-semibold text-gray-900">
-              {calendarEvent.patientName}
-            </h2>
-          </div>
-          {calendarEvent.status && getStatusBadge(calendarEvent.status)}
-        </div>
-        
-        <div className="grid grid-cols-1 gap-4">
-          <div className="flex items-center space-x-3">
-            <Stethoscope className="h-5 w-5 text-blue-600" />
-            <div>
-              <p className="text-sm font-medium text-gray-700">Consulta</p>
-              <p className="text-gray-900">{calendarEvent.consultationReason}</p>
-            </div>
-          </div>
-          
-          <div className="flex items-center space-x-3">
-            <Clock className="h-5 w-5 text-blue-600" />
-            <div>
-              <p className="text-sm font-medium text-gray-700">Horario</p>
-              <p className="text-gray-900">{calendarEvent.appointmentTime}</p>
-            </div>
-          </div>
-          
-          <div className="flex items-center space-x-3">
-            <Phone className="h-5 w-5 text-blue-600" />
-            <div>
-              <p className="text-sm font-medium text-gray-700">Teléfono</p>
-              <p className="text-gray-600">{calendarEvent.phoneNumber}</p>
-            </div>
-          </div>
-          
-          {calendarEvent.note && (
-            <div className="flex items-start space-x-3">
-              <User className="h-5 w-5 text-blue-600 mt-0.5" />
-              <div>
-                <p className="text-sm font-medium text-gray-700">Notas</p>
-                <p className="text-gray-900 text-sm whitespace-pre-line">{calendarEvent.note}</p>
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
-    )
-  }, [])
-
   // PERFORMANCE OPTIMIZATION: Memoize custom components object to prevent recreation
   // Ensures ScheduleXCalendar doesn't re-render when form state changes
   const customComponents = useMemo(() => ({
     eventModal: CustomEventModal
-  }), [CustomEventModal])
+  }), [])
  
   // Use transformed events from N8N API instead of static data
   // Events are automatically updated when appointments change
@@ -411,151 +690,3 @@ export function CalendarView({ clinicId }: CalendarViewProps) {
     </div>
   )
 }
-
-
-
-// "use client"
-
-// import { useState } from "react"
-// import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-// import { Button } from "@/components/ui/button"
-// import { ChevronLeft, ChevronRight } from "lucide-react"
-
-// const daysOfWeek = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"]
-// const months = [
-//   "Enero",
-//   "Febrero",
-//   "Marzo",
-//   "Abril",
-//   "Mayo",
-//   "Junio",
-//   "Julio",
-//   "Agosto",
-//   "Septiembre",
-//   "Octubre",
-//   "Noviembre",
-//   "Diciembre",
-// ]
-
-// export function CalendarView() {
-//   const [currentDate, setCurrentDate] = useState(new Date())
-
-//   const getDaysInMonth = (date: Date) => {
-//     const year = date.getFullYear()
-//     const month = date.getMonth()
-//     const firstDay = new Date(year, month, 1)
-//     const lastDay = new Date(year, month + 1, 0)
-//     const daysInMonth = lastDay.getDate()
-//     const startingDayOfWeek = firstDay.getDay()
-
-//     const days = []
-
-//     // Add empty cells for days before the first day of the month
-//     for (let i = 0; i < startingDayOfWeek; i++) {
-//       days.push(null)
-//     }
-
-//     // Add days of the month
-//     for (let day = 1; day <= daysInMonth; day++) {
-//       days.push(day)
-//     }
-
-//     return days
-//   }
-
-//   const navigateMonth = (direction: "prev" | "next") => {
-//     setCurrentDate((prev) => {
-//       const newDate = new Date(prev)
-//       if (direction === "prev") {
-//         newDate.setMonth(prev.getMonth() - 1)
-//       } else {
-//         newDate.setMonth(prev.getMonth() + 1)
-//       }
-//       return newDate
-//     })
-//   }
-
-//   const days = getDaysInMonth(currentDate)
-//   const today = new Date()
-//   const isToday = (day: number | null) => {
-//     if (!day) return false
-//     return (
-//       day === today.getDate() &&
-//       currentDate.getMonth() === today.getMonth() &&
-//       currentDate.getFullYear() === today.getFullYear()
-//     )
-//   }
-
-//   // Mock appointments
-//   const appointments = {
-//     15: [
-//       { time: "09:00", patient: "Ana García" },
-//       { time: "14:30", patient: "Carlos López" },
-//     ],
-//     22: [{ time: "10:00", patient: "María Rodríguez" }],
-//     28: [
-//       { time: "11:00", patient: "José Martínez" },
-//       { time: "16:00", patient: "Laura Sánchez" },
-//     ],
-//   }
-
-//   return (
-//     <div className="p-6 h-full">
-//       <Card className="h-full">
-//         <CardHeader>
-//           <div className="flex items-center justify-between">
-//             <CardTitle className="text-xl">
-//               {months[currentDate.getMonth()]} {currentDate.getFullYear()}
-//             </CardTitle>
-//             <div className="flex space-x-2">
-//               <Button variant="outline" size="sm" onClick={() => navigateMonth("prev")}>
-//                 <ChevronLeft className="h-4 w-4" />
-//               </Button>
-//               <Button variant="outline" size="sm" onClick={() => navigateMonth("next")}>
-//                 <ChevronRight className="h-4 w-4" />
-//               </Button>
-//             </div>
-//           </div>
-//         </CardHeader>
-//         <CardContent className="p-0">
-//           <div className="grid grid-cols-7 border-b">
-//             {daysOfWeek.map((day) => (
-//               <div key={day} className="p-3 text-center font-medium text-gray-600 border-r last:border-r-0">
-//                 {day}
-//               </div>
-//             ))}
-//           </div>
-//           <div className="grid grid-cols-7" style={{ height: "calc(100vh - 200px)" }}>
-//             {days.map((day, index) => (
-//               <div key={index} className="border-r border-b last:border-r-0 p-2 min-h-[120px] relative">
-//                 {day && (
-//                   <>
-//                     <div
-//                       className={`text-sm font-medium mb-1 ${
-//                         isToday(day)
-//                           ? "bg-blue-500 text-white rounded-full w-6 h-6 flex items-center justify-center"
-//                           : ""
-//                       }`}
-//                     >
-//                       {day}
-//                     </div>
-//                     {appointments[day as keyof typeof appointments] && (
-//                       <div className="space-y-1">
-//                         {appointments[day as keyof typeof appointments].map((apt, i) => (
-//                           <div key={i} className="text-xs bg-blue-100 text-blue-800 p-1 rounded">
-//                             <div className="font-medium">{apt.time}</div>
-//                             <div className="truncate">{apt.patient}</div>
-//                           </div>
-//                         ))}
-//                       </div>
-//                     )}
-//                   </>
-//                 )}
-//               </div>
-//             ))}
-//           </div>
-//         </CardContent>
-//       </Card>
-//     </div>
-//   )
-// }
